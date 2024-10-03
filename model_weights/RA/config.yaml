@@ -1,0 +1,366 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.21
+    code_path: code/onpolicy/scripts/train_mpe.py
+    framework: lightning
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.8.13
+    start_time: 1717606625.0
+    t:
+      1:
+      - 1
+      - 55
+      2:
+      - 1
+      - 9
+      - 40
+      - 41
+      - 50
+      - 55
+      - 77
+      3:
+      - 2
+      - 4
+      - 13
+      - 16
+      4: 3.8.13
+      5: 0.12.21
+      8:
+      - 5
+actor_graph_aggr:
+  desc: null
+  value: node
+algorithm_name:
+  desc: null
+  value: rmappo
+auto_mini_batch_size:
+  desc: null
+  value: true
+clip_param:
+  desc: null
+  value: 0.2
+collaborative:
+  desc: null
+  value: false
+collision_rew:
+  desc: null
+  value: 30.0
+critic_graph_aggr:
+  desc: null
+  value: global
+critic_lr:
+  desc: null
+  value: 0.0007
+cuda:
+  desc: null
+  value: true
+cuda_deterministic:
+  desc: null
+  value: true
+data_chunk_length:
+  desc: null
+  value: 10
+embed_add_self_loop:
+  desc: null
+  value: false
+embed_hidden_size:
+  desc: null
+  value: 16
+embed_layer_N:
+  desc: null
+  value: 1
+embed_use_ReLU:
+  desc: null
+  value: true
+embedding_size:
+  desc: null
+  value: 2
+entropy_coef:
+  desc: null
+  value: 0.01
+env_name:
+  desc: null
+  value: GraphMPE
+episode_length:
+  desc: null
+  value: 25
+eval_episodes:
+  desc: null
+  value: 32
+eval_interval:
+  desc: null
+  value: 25
+experiment_name:
+  desc: null
+  value: base_nav_base_formation_graph_randomgoal_nocollab_30goal_3mil
+fair_rew:
+  desc: null
+  value: 1
+fair_wt:
+  desc: null
+  value: 1
+gae_lambda:
+  desc: null
+  value: 0.95
+gain:
+  desc: null
+  value: 0.01
+gamma:
+  desc: null
+  value: 0.99
+global_aggr_type:
+  desc: null
+  value: mean
+gnn_concat_heads:
+  desc: null
+  value: false
+gnn_hidden_size:
+  desc: null
+  value: 16
+gnn_layer_N:
+  desc: null
+  value: 2
+gnn_num_heads:
+  desc: null
+  value: 3
+gnn_use_ReLU:
+  desc: null
+  value: true
+goal_rew:
+  desc: null
+  value: 30.0
+graph_feat_type:
+  desc: null
+  value: relative
+hidden_size:
+  desc: null
+  value: 64
+huber_delta:
+  desc: null
+  value: 10.0
+ifi:
+  desc: null
+  value: 0.1
+img_interval:
+  desc: null
+  value: 2
+increase_fairness:
+  desc: null
+  value: false
+layer_N:
+  desc: null
+  value: 1
+log_interval:
+  desc: null
+  value: 5
+lr:
+  desc: null
+  value: 0.0007
+max_batch_size:
+  desc: null
+  value: 32
+max_edge_dist:
+  desc: null
+  value: 1
+max_grad_norm:
+  desc: null
+  value: 10.0
+max_speed:
+  desc: null
+  value: 2
+min_dist_thresh:
+  desc: null
+  value: 0.05
+min_obs_dist:
+  desc: null
+  value: 0.5
+model_dir:
+  desc: null
+  value: null
+model_name:
+  desc: null
+  value: FA_FR
+n_eval_rollout_threads:
+  desc: null
+  value: 1
+n_render_rollout_threads:
+  desc: null
+  value: 1
+n_rollout_threads:
+  desc: null
+  value: 128
+n_training_threads:
+  desc: null
+  value: 1
+num_agents:
+  desc: null
+  value: 3
+num_agents_per_team:
+  desc: null
+  value: 3
+num_embeddings:
+  desc: null
+  value: 4
+num_env_steps:
+  desc: null
+  value: 3000000
+num_landmarks:
+  desc: null
+  value: 3
+num_mini_batch:
+  desc: null
+  value: 1
+num_nbd_entities:
+  desc: null
+  value: 3
+num_obstacles:
+  desc: null
+  value: 3
+num_scripted_agents:
+  desc: null
+  value: 0
+num_teams:
+  desc: null
+  value: 1
+num_walls:
+  desc: null
+  value: 0
+obs_type:
+  desc: null
+  value: global
+opti_eps:
+  desc: null
+  value: 1.0e-05
+ppo_epoch:
+  desc: null
+  value: 10
+project_name:
+  desc: null
+  value: fair_test_3
+recurrent_N:
+  desc: null
+  value: 1
+render_episodes:
+  desc: null
+  value: 5
+render_eval:
+  desc: null
+  value: false
+save_gifs:
+  desc: null
+  value: true
+save_interval:
+  desc: null
+  value: 1
+scenario_name:
+  desc: null
+  value: nav_base_formation_graph_randomgoal
+seed:
+  desc: null
+  value: 1
+share_policy:
+  desc: null
+  value: true
+split_batch:
+  desc: null
+  value: false
+stacked_frames:
+  desc: null
+  value: 1
+target_mini_batch_size:
+  desc: null
+  value: 8192
+use_ReLU:
+  desc: null
+  value: false
+use_cent_obs:
+  desc: null
+  value: false
+use_centralized_V:
+  desc: null
+  value: true
+use_clipped_value_loss:
+  desc: null
+  value: true
+use_comm:
+  desc: null
+  value: false
+use_dones:
+  desc: null
+  value: false
+use_eval:
+  desc: null
+  value: false
+use_feature_normalization:
+  desc: null
+  value: true
+use_gae:
+  desc: null
+  value: true
+use_huber_loss:
+  desc: null
+  value: true
+use_linear_lr_decay:
+  desc: null
+  value: false
+use_max_grad_norm:
+  desc: null
+  value: true
+use_naive_recurrent_policy:
+  desc: null
+  value: false
+use_obs_instead_of_state:
+  desc: null
+  value: false
+use_orthogonal:
+  desc: null
+  value: true
+use_policy_active_masks:
+  desc: null
+  value: true
+use_popart:
+  desc: null
+  value: true
+use_proper_time_limits:
+  desc: null
+  value: false
+use_recurrent_policy:
+  desc: null
+  value: true
+use_render:
+  desc: null
+  value: false
+use_stacked_frames:
+  desc: null
+  value: false
+use_value_active_masks:
+  desc: null
+  value: true
+use_valuenorm:
+  desc: null
+  value: false
+use_wandb:
+  desc: null
+  value: true
+user_name:
+  desc: null
+  value: marl
+value_loss_coef:
+  desc: null
+  value: 1
+verbose:
+  desc: null
+  value: true
+weight_decay:
+  desc: null
+  value: 0
+world_size:
+  desc: null
+  value: 2
+zeroshift:
+  desc: null
+  value: 5

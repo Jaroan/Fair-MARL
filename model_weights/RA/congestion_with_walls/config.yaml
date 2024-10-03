@@ -1,0 +1,359 @@
+wandb_version: 1
+
+fair_wt:
+  desc: null
+  value: 1
+fair_rew:
+  desc: null
+  value: 1
+num_agents_per_team:
+  desc: null
+  value: 3
+num_teams:
+  desc: null
+  value: 1
+zeroshift:
+  desc: null
+  value: 5
+increase_fairness:
+  desc: null
+  value: false
+min_obs_dist:
+  desc: null
+  value: 0.5
+model_name:
+  desc: null
+  value: FA_FR
+algorithm_name:
+  desc: null
+  value: rmappo
+project_name:
+  desc: null
+  value: fair_test_3
+experiment_name:
+  desc: null
+  value: base_nav_base_formation_graph_wall_randomgoal_nocollab_30goal_3mil
+seed:
+  desc: null
+  value: 0
+cuda:
+  desc: null
+  value: true
+cuda_deterministic:
+  desc: null
+  value: true
+n_training_threads:
+  desc: null
+  value: 1
+n_rollout_threads:
+  desc: null
+  value: 128
+n_eval_rollout_threads:
+  desc: null
+  value: 1
+n_render_rollout_threads:
+  desc: null
+  value: 1
+num_env_steps:
+  desc: null
+  value: 3000000
+user_name:
+  desc: null
+  value: marl
+use_wandb:
+  desc: null
+  value: true
+env_name:
+  desc: null
+  value: GraphMPE
+use_obs_instead_of_state:
+  desc: null
+  value: false
+world_size:
+  desc: null
+  value: 2
+num_scripted_agents:
+  desc: null
+  value: 0
+obs_type:
+  desc: null
+  value: global
+max_edge_dist:
+  desc: null
+  value: 1
+num_nbd_entities:
+  desc: null
+  value: 3
+use_comm:
+  desc: null
+  value: false
+num_walls:
+  desc: null
+  value: 2
+episode_length:
+  desc: null
+  value: 25
+share_policy:
+  desc: null
+  value: true
+use_centralized_V:
+  desc: null
+  value: true
+stacked_frames:
+  desc: null
+  value: 1
+use_stacked_frames:
+  desc: null
+  value: false
+hidden_size:
+  desc: null
+  value: 64
+layer_N:
+  desc: null
+  value: 1
+use_ReLU:
+  desc: null
+  value: false
+use_popart:
+  desc: null
+  value: true
+use_valuenorm:
+  desc: null
+  value: false
+use_feature_normalization:
+  desc: null
+  value: true
+use_orthogonal:
+  desc: null
+  value: true
+gain:
+  desc: null
+  value: 0.01
+split_batch:
+  desc: null
+  value: false
+max_batch_size:
+  desc: null
+  value: 32
+use_naive_recurrent_policy:
+  desc: null
+  value: false
+use_recurrent_policy:
+  desc: null
+  value: true
+recurrent_N:
+  desc: null
+  value: 1
+data_chunk_length:
+  desc: null
+  value: 10
+lr:
+  desc: null
+  value: 0.0007
+critic_lr:
+  desc: null
+  value: 0.0007
+opti_eps:
+  desc: null
+  value: 1.0e-05
+weight_decay:
+  desc: null
+  value: 0
+ppo_epoch:
+  desc: null
+  value: 10
+use_clipped_value_loss:
+  desc: null
+  value: true
+clip_param:
+  desc: null
+  value: 0.2
+num_mini_batch:
+  desc: null
+  value: 1
+entropy_coef:
+  desc: null
+  value: 0.01
+value_loss_coef:
+  desc: null
+  value: 1
+use_max_grad_norm:
+  desc: null
+  value: true
+max_grad_norm:
+  desc: null
+  value: 10.0
+use_gae:
+  desc: null
+  value: true
+gamma:
+  desc: null
+  value: 0.99
+gae_lambda:
+  desc: null
+  value: 0.95
+use_proper_time_limits:
+  desc: null
+  value: false
+use_huber_loss:
+  desc: null
+  value: true
+use_value_active_masks:
+  desc: null
+  value: true
+use_policy_active_masks:
+  desc: null
+  value: true
+huber_delta:
+  desc: null
+  value: 10.0
+use_linear_lr_decay:
+  desc: null
+  value: false
+save_interval:
+  desc: null
+  value: 1
+log_interval:
+  desc: null
+  value: 5
+img_interval:
+  desc: null
+  value: 2
+use_eval:
+  desc: null
+  value: false
+eval_interval:
+  desc: null
+  value: 25
+eval_episodes:
+  desc: null
+  value: 32
+save_gifs:
+  desc: null
+  value: true
+use_render:
+  desc: null
+  value: false
+render_episodes:
+  desc: null
+  value: 5
+ifi:
+  desc: null
+  value: 0.1
+render_eval:
+  desc: null
+  value: false
+model_dir:
+  desc: null
+  value: null
+verbose:
+  desc: null
+  value: true
+scenario_name:
+  desc: null
+  value: nav_base_formation_graph_randomgoal
+num_landmarks:
+  desc: null
+  value: 3
+num_agents:
+  desc: null
+  value: 3
+num_obstacles:
+  desc: null
+  value: 3
+collaborative:
+  desc: null
+  value: false
+max_speed:
+  desc: null
+  value: 2
+collision_rew:
+  desc: null
+  value: 30.0
+goal_rew:
+  desc: null
+  value: 30.0
+min_dist_thresh:
+  desc: null
+  value: 0.05
+use_dones:
+  desc: null
+  value: false
+num_embeddings:
+  desc: null
+  value: 4
+embedding_size:
+  desc: null
+  value: 2
+embed_hidden_size:
+  desc: null
+  value: 16
+embed_layer_N:
+  desc: null
+  value: 1
+embed_use_ReLU:
+  desc: null
+  value: true
+embed_add_self_loop:
+  desc: null
+  value: false
+gnn_hidden_size:
+  desc: null
+  value: 16
+gnn_num_heads:
+  desc: null
+  value: 3
+gnn_concat_heads:
+  desc: null
+  value: false
+gnn_layer_N:
+  desc: null
+  value: 2
+gnn_use_ReLU:
+  desc: null
+  value: true
+graph_feat_type:
+  desc: null
+  value: relative
+actor_graph_aggr:
+  desc: null
+  value: node
+critic_graph_aggr:
+  desc: null
+  value: global
+global_aggr_type:
+  desc: null
+  value: mean
+use_cent_obs:
+  desc: null
+  value: false
+auto_mini_batch_size:
+  desc: null
+  value: true
+target_mini_batch_size:
+  desc: null
+  value: 8192
+_wandb:
+  desc: null
+  value:
+    code_path: code/onpolicy/scripts/train_mpe.py
+    python_version: 3.8.13
+    cli_version: 0.13.5
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1717617472.756027
+    t:
+      1:
+      - 1
+      - 55
+      3:
+      - 4
+      - 13
+      - 16
+      - 23
+      - 42
+      4: 3.8.13
+      5: 0.13.5
+      8:
+      - 5

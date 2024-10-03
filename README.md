@@ -1,4 +1,4 @@
-# Cooperation and Fairness in Multi-Agent Reinforcement Learning (FAIR-MARL)
+# Cooperation and Fairness in Multi-Agent Reinforcement Learning (Fair-MARL)
 
 This repository contains the code for the paper **"Cooperation and Fairness in Multi-Agent Reinforcement Learning"**, which introduces a method to incorporate fairness for multi-agent navigation tasks. The method builds on the InforMARL framework and extends it to ensure fair cooperation in scenarios like MPE's simple spread (coverage) and formation.
 
@@ -17,9 +17,9 @@ This repository contains the code for the paper **"Cooperation and Fairness in M
 
 ## Introduction
 
-The FAIR-MARL method addresses fairness in cooperative multi-agent reinforcement learning (MARL), where agents must not only achieve task success but also do so in a manner that promotes fairness in navigation for all agents. This is particularly relevant in tasks involving navigation, such as:
+The Fair-MARL method addresses fairness in cooperative multi-agent reinforcement learning (MARL), where agents must not only achieve task success but also do so in a manner that promotes fairness in navigation for all agents. This is particularly relevant in tasks involving navigation, such as:
 
-- **Simple Spread**: Agents must spread out to cover target locations.
+- **Coverage Navigation**: Agents must spread out to cover target locations.
 - **Formation**: Agents must arrange themselves in specific formations.
 
 Our approach extends the **InforMARL** framework to include fairness in the goal assignment and rewards, enabling agents to learn policies that are both efficient and fair. 
@@ -37,7 +37,7 @@ You can find the MPE environment here: [Multi-Agent Particle Environment (MPE)](
 
 ## Installation
 
-To get started with the FAIR-MARL method, clone this repository and install the required dependencies:
+To get started with the Fair-MARL method, clone this repository and install the required dependencies:
 
 ```bash
 git clone https://github.com/yourusername/fair-marl.git
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 ```
 
 ### Dependencies
-- Python 3.7+
+- Python 3.9+
 - PyTorch
 - OpenAI Gym
 - Multi-Agent Particle Environment (MPE)
@@ -55,23 +55,33 @@ pip install -r requirements.txt
 
 ### Training
 
-To train the FAIR-MARL agents on the coverage tasks run the following command:
+To train the Fair-MARL agents on the coverage tasks run the following command:
 
 ```bash
-python train_mpe.py --env simple_spread --algorithm fair-marl
+python -u onpolicy/scripts/train_mpe.py \
+--project_name "test" \
+--env_name "GraphMPE" \
+--algorithm_name "rmappo" \
+--seed 2 \
+--experiment_name "test123" \
+--scenario_name "navigation_graph"
 ```
 
-This will train agents using the FAIR-MARL method on the chosen task (`simple_spread` in this case). Additional parameters for training, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
+This will train agents using the Fair-MARL method on the chosen task (`navigation_graph` in this case). Additional parameters for training, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
 
 ### Evaluation
 
 After training, you can evaluate the trained agents by running:
 
 ```bash
-python eval_mpe.py --model_dir ./models/fair-marl/simple_spread
+python onpolicy/scripts/eval_mpe.py \
+--model_dir='model_weights/FA' \
+--render_episodes=1 \
+--seed=0 \
+--scenario_name='navigation_graph'
 ```
 
-This will load the trained model and evaluate its performance in the specified environment.
+This will load the trained model and evaluate its performance in the specified environment. Additional parameters for evaluation, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
 
 ## Code Structure
 
@@ -84,25 +94,25 @@ This will load the trained model and evaluate its performance in the specified e
 ├── eval_scripts                  # Evaluation Script
 ├── model_weights/                # Directory for saving trained models
 ├── utils/                        # Configuration files for different environments and algorithms
-├── multi-agent/                    # FAIR-MARL specific code
-│   ├── custom-scenarios              # Core FAIR-MARL Algorithm
+├── multi-agent/                    # Fair-MARL specific code
+│   ├── custom-scenarios              # Core Fair-MARL Algorithm
 │   ├── navigation_environment.py        # Fairness-based goal assignment logic
 │   ├── agent.py                  # Multi-agent definitions
 │   └── utils.py                  # Utility functions
 └── onpolicy/                          # MPE environment files (if necessary)
 ```
 
-- **`fair_marl/algorithm.py`**: Implements the FAIR-MARL reinforcement learning algorithm.
-- **`fairness_module.py`**: Contains the logic for fair goal assignment.
-- **`agent.py`**: Defines the multi-agent RL structure and policy updates.
-- **`train.py`**: Script to launch the training process.
-- **`evaluate.py`**: Script to evaluate the performance of the trained agents.
+- **`multiagent/custom_scenarios/navigation_graph.py`**: Implements the Fair-MARL reinforcement learning algorithm.
+- **`marl_fair_assign.py`**: Contains the logic for fair goal assignment.
+
+- We have created adocument detailing the network architecture here:
+- We have created a document for easy understandng of our codebase here
 
 ## Results
 
-Here we summarize the results from the experiments. The FAIR-MARL method achieves **fairer goal assignment** and **better cooperation** compared to baseline methods. For example:
+Here we summarize the results from the experiments. The Fair-MARL method achieves **fairer goal assignment** and **better cooperation** compared to baseline methods. For example:
 
-- **Simple Spread**: FAIR-MARL agents spread out more equitably to different target locations.
+- **Coverage navigation**: Fair-MARL agents spread out more equitably to different target locations.
 - **Formation**: Agents arrange themselves in stable formations while ensuring fairness in positional assignments.
 
 For detailed results and analysis, please refer to our paper.
@@ -112,11 +122,11 @@ For detailed results and analysis, please refer to our paper.
 If you find this repository helpful in your research, please cite the corresponding paper:
 
 ```bibtex
-@article{aloor2023fairmarl,
+@article{aloor2024fairmarl,
   title={Cooperation and Fairness in Multi-Agent Reinforcement Learning},
   author={ },
   journal={ACM Journal of Autonomous Transportation Systems},
-  year={2023},
+  year={2024},
   volume={XX},
   pages={YY-ZZ},
 }
@@ -124,3 +134,5 @@ If you find this repository helpful in your research, please cite the correspond
 
 ## Acknowledgements
 
+
+### Related papers
