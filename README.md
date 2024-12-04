@@ -1,6 +1,6 @@
 # Cooperation and Fairness in Multi-Agent Reinforcement Learning (Fair-MARL)
 
-This repository contains the code for the paper **"Cooperation and Fairness in Multi-Agent Reinforcement Learning"**, which introduces a method to incorporate fairness for multi-agent navigation tasks. The method builds on the InforMARL framework and extends it to ensure fair cooperation in scenarios like MPE's simple spread (coverage) and formation.
+This repository contains the code for the paper **"[Cooperation and Fairness in Multi-Agent Reinforcement Learning](https://dl.acm.org/doi/full/10.1145/3702012)"**, which introduces a method to incorporate fairness for multi-agent navigation tasks. The method builds on the InforMARL framework and extends it to ensure fair cooperation in scenarios like MPE's simple spread (coverage) and formation.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 ```
 
 ### Dependencies
-- Python 3.9+
+- Python 3.10+
 - PyTorch
 - OpenAI Gym
 - Multi-Agent Particle Environment (MPE)
@@ -55,7 +55,7 @@ pip install -r requirements.txt
 
 ### Training
 
-To train the Fair-MARL agents on the coverage tasks run the following command:
+Training scripts are located in the folder ```train_scripts```. To train the Fair-MARL agents on the coverage tasks the command is alongg the following lines:
 
 ```bash
 python -u onpolicy/scripts/train_mpe.py \
@@ -69,16 +69,32 @@ python -u onpolicy/scripts/train_mpe.py \
 
 This will train agents using the Fair-MARL method on the chosen task (`navigation_graph` in this case). Additional parameters for training, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
 
+> NOTE: Please note that for training we have enabled wandb logging by default. Please inspect your logging mechanishm or use the flag `--use_wandb` to prevent wandb longging.
+
 ### Evaluation
 
 After training, you can evaluate the trained agents by running:
 
 ```bash
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA' \
---render_episodes=1 \
+--model_dir='model_weights/FA_FR' \
+--render_episodes=2 \
+--world_size=3 \
+--num_agents=3 \
+--num_obstacles=0 \
 --seed=0 \
---scenario_name='navigation_graph'
+--num_landmarks=3 \
+--episode_length=50 \
+--use_dones=False \
+--collaborative=False --model_name='FA_FR' \
+--scenario_name='nav_base_formation_graph_nogoal' \
+--goal_rew=30 \
+--fair_rew=1 \
+--save_gifs \
+--use_render \
+--num_walls=0 \
+--zeroshift=5 \
+--min_obs_dist 0.5
 ```
 
 This will load the trained model and evaluate its performance in the specified environment. Additional parameters for evaluation, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
@@ -91,7 +107,7 @@ This will load the trained model and evaluate its performance in the specified e
 ├── license                       # Project license file
 ├── requirements.txt              # Dependencies
 ├── train_scripts                 # Training Script
-├── eval_scripts                  # Evaluation Script
+├── eval_scripts                  # Sample Evaluation Script using Trained models
 ├── model_weights/                # Directory for saving trained models
 ├── utils/                        # Configuration files for different environments and algorithms
 ├── multi-agent/                    # Fair-MARL specific code
@@ -122,14 +138,14 @@ For detailed results and analysis, please refer to our paper.
 If you find this repository helpful in your research, please cite the corresponding paper:
 
 ```bibtex
-@article{aloor2024fairmarl,
+@article{aloor2024cooperation,
   title={Cooperation and Fairness in Multi-Agent Reinforcement Learning},
-  author={ },
-  journal={ACM Journal of Autonomous Transportation Systems},
+  author={Aloor, Jasmine and Nayak, Siddharth Nagar and Dolan, Sydney and Balakrishnan, Hamsa},
+  journal={Journal on Autonomous Transportation Systems},
   year={2024},
-  volume={XX},
-  pages={YY-ZZ},
+  publisher={ACM New York, NY}
 }
+
 ```
 
 ## Acknowledgements
