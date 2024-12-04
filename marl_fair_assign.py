@@ -43,7 +43,7 @@ def solve_fair_assignment(costs):
         for constr in m.aux.values():
             solver.remove_constraint(constr)
         m.del_component(m.aux)
-        m.del_component(m.aux_index)
+        # m.del_component(m.aux_index)
         m.aux = pe.Constraint(m.ns, m.ms, rule=lambda m,i,j: cost_helper[i,j]*m.x[i,j] <= m.z)
         for constr in m.aux.values():
             solver.add_constraint(constr)

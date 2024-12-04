@@ -603,7 +603,7 @@ class GMPERunner(Runner):
 		time_fairness, time_stddev_param, time_mean = [], [], []
 		print("num_episodes: ", self.all_args.render_episodes)
 
-		with open('/Users/jasmine/Jasmine/MIT/MARL/Codes/Team-Fair-MARL/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_fair_vs_success.csv', 'a', newline="") as f1:
+		with open('model_weights/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_fair_vs_success.csv', 'a', newline="") as f1:
 			# create the csv writer
 			writer = csv.writer(f1)
 
@@ -803,7 +803,7 @@ class GMPERunner(Runner):
 			total_dists_traveled[-1],
 			total_time_taken[-1],
 			]
-			with open('/Users/jasmine/Jasmine/MIT/MARL/Codes/Team-Fair-MARL/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_fair_vs_success_new.csv', 'a', newline="") as f1:
+			with open('model_weights/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_fair_vs_success_new.csv', 'a', newline="") as f1:
 				# create the csv writer
 				writer = csv.writer(f1)
 				writer.writerow(csv_data1)
@@ -1026,7 +1026,6 @@ class GMPERunner(Runner):
 			total_time_taken_max			
 		]
 
-		# csv_2 = [fairness_param]
 		# open the file in the write mode
 		with open('/Users/jasmine/Jasmine/MIT/MARL/Codes/Team-Fair-MARL/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_results_collect_new.csv', 'a', newline="") as f:
 			# create the csv writer
@@ -1035,22 +1034,6 @@ class GMPERunner(Runner):
 			# write a row to the csv file
 			writer.writerow(csv_data)
 
-		# # open the file in the write mode
-		# with open('/Users/jasmine/Jasmine/MIT/MARL/Codes/Team-Fair-MARL/fairness_plot.csv', 'a', newline="") as f:
-		# 	# create the csv writer
-		# 	writer = csv.writer(f)
-
-		# 	# write a row to the csv file
-		# 	writer.writerow(csv_2)
-		# 	writer.writerow(dist_mean_arr)
-		# 	writer.writerow(dist_std_dev_arr)
-		# print((rewards_arr))
-		# print((frac_episode_arr))
-		# print((success_rates_arr))
-		# print((num_collisions_arr))
-		# print("Fairness",(fairness_param))
-
-		# self.save_images(all_frames, "test")
 		
 		if not get_metrics:
 			if self.all_args.save_gifs:
