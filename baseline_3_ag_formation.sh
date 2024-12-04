@@ -33,7 +33,7 @@ seeds=(0 1)
 # echo "seed: ${seed}"
 # execute the script with different params
 python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
---project_name "speedup_efficiency_tests_${n_agents}" \
+--project_name "new_gnn_${n_agents}" \
 --env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seeds[$SLURM_ARRAY_TASK_ID]} \
