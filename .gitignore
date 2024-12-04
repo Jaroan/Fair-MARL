@@ -27,7 +27,6 @@ fair_try/
 spec-file.txt
 conda_var_pakage_list.txt
 env_versions.txt
-commands_test_run.txt
 *.csv
 *.pdf
 baseline_try/
