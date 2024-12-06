@@ -38,12 +38,10 @@ class MultiAgentBaseEnv(gym.Env):
 		self.num_agents = len(world.policy_agents)  # for compatibility with offpolicy baseline envs
 		# scenario callbacks
 		self.reset_callback = reset_callback
-		# print("reward_callback: ", reward_callback)
 		self.reward_callback = reward_callback
 		self.observation_callback = observation_callback
 		self.info_callback = info_callback
 		self.done_callback = done_callback
-		# print("done_callback: ", done_callback)
 		self.scenario_name = scenario_name
 		# environment parameters
 		# self.discrete_action_space = True
@@ -236,23 +234,12 @@ class MultiAgentBaseEnv(gym.Env):
 
 	def _get_done(self, agent, count = None):
 		# print("get done count ",count )
-		# print("entered get done: ",agent.status)
 		if agent.status ==True:
-			# print("did it enter agent status so its returnng true")
 			return True
-		# print("current step: ",self.current_step,"self world lenght",self.world_length)
 		if self.current_step >= self.world_length:
 			return True
 		else:
 			return False
-		# if ((self.world.landmarks[agent.id].state.p_pos[0] - self.world.agents[agent.id].state.p_pos[0])**2 +  (self.world.landmarks[agent.id].state.p_pos[1] - self.world.agents[agent.id].state.p_pos[1]   )**2)**.5<0.05:
-		# 	# print(‘its near the goal ’)
-		# 	agent.status = True
-		# 	self.agent_comp[agent.id]  = self.world.agents[agent.id].state.p_pos
-		# 	self.world.agents[agent.id].state.p_vel[0]=0
-		# 	self.world.agents[agent.id].state.p_vel[1]=0
-		# 	return True
-		# return False
 
 
 	# get reward for a particular agent
@@ -294,7 +281,6 @@ class MultiAgentBaseEnv(gym.Env):
 				if action[0] == 4: agent.action.u[1] = +1.0
 			else:
 				if self.force_discrete_action:
-					# print("force_discrete_action",self.force_discrete_action)
 					d = np.argmax(action[0])
 					action[0][:] = 0.0
 					action[0][d] = 1.0
@@ -302,14 +288,11 @@ class MultiAgentBaseEnv(gym.Env):
 					agent.action.u[0] += action[0][1] - action[0][2]
 					agent.action.u[1] += action[0][3] - action[0][4]
 				else:
-					# print("else not discrete_action_space",action)
 					agent.action.u = action[0]
 			sensitivity = 5.0
 			if agent.accel is not None:
 				sensitivity = agent.accel
-			# print("agent.action.u",agent.action.u,sensitivity)
 			agent.action.u *= sensitivity
-			# print("agent.action.u",agent.action.u)
 			# NOTE: refer offpolicy/envs/mpe/environment.py -> MultiAgentEnv._set_action() for non-silent agent
 			action = action[1:]
 		if not agent.silent:
@@ -531,190 +514,6 @@ class MultiAgentBaseEnv(gym.Env):
 					dx.append(np.array([x,y]))
 		return dx
 
-class MultiAgentOrigEnv(MultiAgentBaseEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	"""
-		Parameters:
-		–––––––––––
-		world: World
-			World for the environment. Refer `multiagent/core.py`
-		reset_callback: Callable
-			Reset function for the environment. Refer `reset()` in 
-			`multiagent/navigation.py`
-		reward_callback: Callable
-			Reward function for the environment. Refer `reward()` in 
-			`multiagent/navigation.py`
-		observation_callback: Callable
-			Observation function for the environment. Refer `observation()` 
-			in `multiagent/navigation.py`
-		info_callback: Callable
-			Reset function for the environment. Refer `info_callback()` in 
-			`multiagent/navigation.py`
-		done_callback: Callable
-			Reset function for the environment. Refer `done()` in 
-			`multiagent/navigation.py`
-		shared_viewer: bool
-			If we want a shared viewer for rendering the environment or 
-			individual windows for each agent as the ego
-		discrete_action: bool
-			If the action space is discrete or not
-		scenario_name: str
-			Name of the scenario to be loaded. Refer `multiagent/custom_scenarios.py`
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					info_callback:Callable=None,
-					done_callback:Callable=None, 
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentOrigEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											info_callback,done_callback, 
-											shared_viewer, discrete_action,
-											scenario_name)
-	
-	def step(self, action_n:List) -> Tuple[List, List, List, List]:
-		self.current_step += 1
-		obs_n = []
-		reward_n = []
-		done_n = []
-		info_n = []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		if self.shared_reward:
-			reward_n = [reward] * self.n
-
-		return obs_n, reward_n, done_n, info_n
-
-	def reset(self) -> Tuple[List, Union[None, np.ndarray]]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n = []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-		return obs_n
-		
-class MultiAgentPPOEnv(MultiAgentBaseEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	"""
-		Parameters:
-		–––––––––––
-		world: World
-			World for the environment. Refer `multiagent/core.py`
-		reset_callback: Callable
-			Reset function for the environment. Refer `reset()` in 
-			`multiagent/navigation.py`
-		reward_callback: Callable
-			Reward function for the environment. Refer `reward()` in 
-			`multiagent/navigation.py`
-		observation_callback: Callable
-			Observation function for the environment. Refer `observation()` 
-			in `multiagent/navigation.py`
-		info_callback: Callable
-			Reset function for the environment. Refer `info_callback()` in 
-			`multiagent/navigation.py`
-		done_callback: Callable
-			Reset function for the environment. Refer `done()` in 
-			`multiagent/navigation.py`
-		shared_obs_callback: Callable
-			If we want to concatenate common environment state along with
-			the concatenation of the indidual agent states. This will return 
-			a master state of the environment. Refer 'shared_observation()` in 
-			`multiagent/navigation.py`
-		shared_viewer: bool
-			If we want a shared viewer for rendering the environment or 
-			individual windows for each agent as the ego
-		discrete_action: bool
-			If the action space is discrete or not
-		scenario_name: str
-			Name of the scenario to be loaded. Refer `multiagent/custom_scenarios.py`
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					info_callback:Callable=None,
-					done_callback:Callable=None, 
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentPPOEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											info_callback,done_callback, 
-											shared_viewer, discrete_action,
-											scenario_name)
-		
-	def step(self, action_n:List) -> Tuple[List, List, List, List]:
-		self.current_step += 1
-		obs_n = []
-		reward_n = []
-		done_n = []
-		info_n = []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		if self.shared_reward:
-			reward_n = [[reward]] * self.n  # NOTE this line is different compared to origEnv
-
-		return obs_n, reward_n, done_n, info_n
-
-	def reset(self) -> Tuple[List, Union[None, np.ndarray]]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n = []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-		return obs_n
 
 class MultiAgentGraphEnv(MultiAgentBaseEnv):
 	metadata = {
@@ -833,31 +632,16 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 			obs_n.append(self._get_obs(agent))
 			agent_id_n.append(self._get_id(agent))
 
-			### for prisoners dilemma changes
-			## reward, cooperate, defect = self._get_reward(agent)
 			reward = self._get_reward(agent)
 			reward_n.append(reward)
-			# cooperate_n.append(cooperate)
-			# defect_n.append(defect)
-
-			# print("reward",reward)
-			# updated_reward = self.modify_reward(reward)
-			# print(updated_reward)
-			# reward_n.append(updated_reward)
-			# print("updated_rew",updated_reward.shape)
 
 			node_obs, adj = self._get_graph_obs(agent)
-			# print("node_obs 1 ag", node_obs.shape)
 			node_obs_n.append(node_obs)
-			# print("node_obs_n ", len(node_obs_n))
-			
-			# node_obs_n.append(updated_reward)
-			# print("node_obs_n ", len(node_obs_n))
 			
 			adj_n.append(adj)
 
 			done_n.append(self._get_done(agent))
-			# print("done_n",done_n)
+
 			info = {'individual_reward': reward}
 			env_info = self._get_info(agent)
 			info.update(env_info)   # nothing fancy here, just appending dict to dict
@@ -865,24 +649,19 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 
 		# all agents get total reward in cooperative case
 		reward = np.sum(reward_n)
-		# print("env",reward_n)
+
 		if self.shared_reward:
 			reward_n = [[reward]] * self.n  # NOTE this line is similar to PPOEnv
 		else:
 			reward_n = reward_n
-		# print("shared_reward", reward_n)
-		# new_node_obs = modify_reward(node_obs_n, adj,reward_n)
-		# print("rewards",(reward_n), done_n)
-		# print("---------~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-----------------")
-		return obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
 
-		# return obs_n, agent_id_n, node_obs_n, adj_n, reward_n,cooperate_n, defect_n, done_n, info_n
+		return obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
 
 
 	def reset(self) -> Tuple[List, List, List, List]:
 		self.current_step = 0
 		# reset world
-		# print("ENV RESET CALLED")
+
 		self.reset_callback(self.world)
 		# reset renderer
 		self._reset_render()
@@ -907,526 +686,6 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 			return None
 		return self.id_callback(agent)
 
-class MultiAgentGPGEnv(MultiAgentGraphEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	""" 
-		Multi-agent Graph Policy Gradient Environment compatible with author's 
-		official implementation: https://github.com/arbaazkhan2/gpg_labeled
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					graph_observation_callback:Callable=None,
-					id_callback:Callable=None,
-					info_callback:Callable=None,
-					done_callback:Callable=None,
-					update_graph:Callable=None,
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation_gpg') -> None:
-		super(MultiAgentGPGEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback,
-											graph_observation_callback,
-											id_callback,
-											info_callback,done_callback,
-											update_graph,
-											shared_viewer, discrete_action,
-											scenario_name)    
-
-	def step(self, action_n:List) -> Tuple[List, List, List, List, List, List, List]:
-		if self.update_graph is not None:
-			self.update_graph(self.world)
-		self.current_step += 1
-		obs_n, adj_n, reward_n, done_n, info_n = [], [], [], [], []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		reward_n = [reward] * self.n  # NOTE this is so that all agents get the same reward for GPG
-		done_n = np.array(done_n)
-		
-		# since adj and reward is same for all agents, just return adj_n[0]
-		# done only if all agents are done
-
-		return obs_n, adj_n[0], reward_n[0], done_n.all(), info_n
-
-	def reset(self) -> Tuple[List, List, List, List]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n, adj_n= [], []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-		# since adj for all agents are same, only return adj_n[0]
-		return obs_n, adj_n[0]
-
-class MultiAgentCADRLEnv(MultiAgentBaseEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	"""
-		Collision Avoidance with Deep RL Environment compatible with author's 
-		official implementation: https://github.com/mit-acl/cadrl_ros
-	"""
-	def __init__(self, config_args, phase,
-					world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					info_callback:Callable=None,
-					done_callback:Callable=None, 
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentCADRLEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											info_callback,done_callback, 
-											shared_viewer, discrete_action,
-											scenario_name)
-		# self.radius = config_args.radius
-		# self.v_pref = config_args.v_pref
-		# self.kinematic = config_args.kinematic
-		# self.agent_num = config_args.num_agents
-		# self.xmin = config_args.xmin
-		# self.xmax = config_args.xmax
-		# self.ymin = config_args.ymin
-		# self.ymax = config_args.ymax
-		# self.crossing_radius = config_args.crossing_radius
-		# self.max_time = config_args.max_time
-		# self.agents = [None, None]
-		# self.counter = 0
-		assert phase in ['train', 'test']
-		self.phase = phase
-		# self.test_counter = 0
-	
-	def step(self, action_n:List) -> Tuple[List, List, List, List]:
-		self.current_step += 1
-		obs_n = []
-		reward_n = []
-		done_n = []
-		info_n = []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		if self.shared_reward:
-			reward_n = [reward] * self.n
-
-		return obs_n, reward_n, done_n, info_n
-
-	# def reset(self, case=None) -> Tuple[List, Union[None, np.ndarray]]:
-	#     self.current_step = 0
-	#     # reset world
-	#     self.reset_callback(self.world)
-	#     # reset renderer
-	#     self._reset_render()
-	#     # record observations for each agent
-	#     obs_n = []
-	#     self.agents = self.world.policy_agents
-	#     for agent in self.agents:
-	#         obs_n.append(self._get_obs(agent))
-
-	#     cr = self.crossing_radius
-	#     self.agents[0] = CADRLAgent(-cr, 0, cr, 0, self.radius, self.v_pref, 0, self.kinematic)
-	#     if self.phase == 'train':
-	#         angle = random.random() * math.pi
-	#         while math.sin((math.pi - angle)/2) < 0.3/2:
-	#             angle = random.random() * math.pi
-	#     else:
-	#         if case is not None:
-	#             angle = (case % 10) / 10 * math.pi
-	#             self.test_counter = case
-	#         else:
-	#             angle = (self.test_counter % 10) / 10 * math.pi
-	#             self.test_counter += 1
-	#     x = cr * math.cos(angle)
-	#     y = cr * math.sin(angle)
-	#     theta = angle + math.pi
-	#     self.agents[1] = CADRLAgent(x, y, -x, -y, self.radius, self.v_pref, theta, self.kinematic)
-	#     self.counter = 0
-
-	#     return [self.compute_joint_state(0), self.compute_joint_state(1)]
-	#     # return obs_n
-
-	def reset(self) -> Tuple[List, Union[None, np.ndarray]]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n = []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-		return obs_n
-	
-	# def compute_joint_state(self, agent_idx):
-	#     if self.agents[agent_idx].done:
-	#         return None
-	#     else:
-	#         from baselines.cadrl.cadrl_navigation.utils_cadrl import JointState
-	#         return JointState(*(self.agents[agent_idx].get_full_state() +
-	#                           self.agents[1-agent_idx].get_observable_state()))
-	
-	# def check_boundary(self, agent_idx):
-	#     agent = self.agents[agent_idx]
-	#     return self.xmin < agent.px < self.xmax and self.ymin < agent.py < self.ymax
-
-	# def compute_reward(self, agent_idx, actions):
-	#     """
-	#     When performing one-step lookahead, only one action is known, the position of the other agent is approximate
-	#     When called by step(), both actions are known, the position of the other agent is exact
-	#     """
-	#     agent = self.agents[agent_idx]
-	#     other_agent = self.agents[1-agent_idx]
-	#     # simple collision detection is done by checking the beginning and end position
-	#     dmin = float('inf')
-	#     dmin_time = 1
-	#     for time in [0, 0.5, 1]:
-	#         pos = agent.compute_position(time, actions[agent_idx])
-	#         other_pos = other_agent.compute_position(time, actions[1-agent_idx])
-	#         distance = math.sqrt((pos[0]-other_pos[0])**2 + (pos[1]-other_pos[1])**2)
-	#         if distance < dmin:
-	#             dmin = distance
-	#             dmin_time = time
-	#     final_pos = agent.compute_position(1, actions[agent_idx])
-	#     reached_goal = math.sqrt((final_pos[0] - agent.pgx)**2 + (final_pos[1] - agent.pgy)**2) < self.radius
-
-	#     if dmin < self.radius * 2:
-	#         reward = -0.25
-	#         end_time = dmin_time
-	#     else:
-	#         end_time = 1
-	#         if dmin < self.radius * 2 + 0.2:
-	#             reward = -0.1 - dmin/2
-	#         elif reached_goal:
-	#             reward = 1
-	#         else:
-	#             reward = 0
-
-	#     return reward, end_time
-
-# TODO: merge env.py into CADRL MPE env here? for reset.
-
-class MultiAgentDGNEnv(MultiAgentGraphEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	""" 
-		Multi-agent Graph Convolutional RL Environment compatible with author's 
-		official implementation: https://github.com/jiechuanjiang/pytorch_DGN
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					graph_observation_callback:Callable=None,
-					id_callback:Callable=None,
-					info_callback:Callable=None,
-					done_callback:Callable=None,
-					update_graph:Callable=None,
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentDGNEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											graph_observation_callback,
-											id_callback,
-											info_callback,done_callback,
-											update_graph,
-											shared_viewer, discrete_action,
-											scenario_name)
-	
-
-	def step(self, action_n:List) -> Tuple[List, List, List, List, List, List, List]:
-		if self.update_graph is not None:
-			self.update_graph(self.world)
-		self.current_step += 1
-		obs_n, adj_n, reward_n, done_n, info_n = [], [], [], [], []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		reward_n = [reward] * self.n  # NOTE this is so that all agents get the same reward
-		done_n = np.array(done_n)
-		
-		# since adj and reward is same for all agents, just return adj_n[0]
-		# done only if all agents are done
-
-		return obs_n, adj_n[0], reward_n, done_n.all(), info_n
-	
-	def reset(self) -> Tuple[List, List, List, List]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n, adj_n= [], []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-		# since adj for all agents are same, only return adj_n[0]
-		return obs_n, adj_n[0]
-
-class MultiAgentDGN_ATOCEnv(MultiAgentGraphEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	""" 
-		Multi-agent Graph Convolutional RL Environment compatible with author's 
-		official implementation: https://github.com/jiechuanjiang/pytorch_DGN
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					graph_observation_callback:Callable=None,
-					id_callback:Callable=None,
-					info_callback:Callable=None,
-					done_callback:Callable=None,
-					update_graph:Callable=None,
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentDGN_ATOCEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											graph_observation_callback,
-											id_callback,
-											info_callback,done_callback,
-											update_graph,
-											shared_viewer, discrete_action,
-											scenario_name)
-	
-
-	def step(self, action_n:List) -> Tuple[List, List, List, List, List, List, List]:
-		if self.update_graph is not None:
-			self.update_graph(self.world)
-		self.current_step += 1
-		obs_n, adj_n, reward_n, done_n, info_n = [], [], [], [], []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-			reward = self._get_reward(agent)
-			reward_n.append(reward)
-			done_n.append(self._get_done(agent))
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		reward_n = [reward] * self.n  # NOTE this is so that all agents get the same reward
-		done_n = np.array(done_n)
-		
-		# since adj and reward is same for all agents, just return adj_n[0]
-		# done only if all agents are done
-
-		return obs_n, adj_n[0], reward_n[0], done_n.all(), info_n
-	
-	def reset(self) -> Tuple[List, List, List, List]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n, adj_n= [], []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			node_obs, adj = self._get_graph_obs(agent)
-			adj_n.append(adj)
-		# since adj for all agents are same, only return adj_n[0]
-		return obs_n, adj_n[0]
-
-
-class MultiAgentOffPolicyEnv(MultiAgentBaseEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	"""
-		This Environment is only for the off-policy baselines
-		The only difference is the way in which the `rewards` and `dones` 
-		are returned. Here they are returned as a list of `dones` and `rewards` 
-		instead of just scalars
-		Parameters:
-		–––––––––––
-		world: World
-			World for the environment. Refer `multiagent/core.py`
-		reset_callback: Callable
-			Reset function for the environment. Refer `reset()` in 
-			`multiagent/navigation.py`
-		reward_callback: Callable
-			Reward function for the environment. Refer `reward()` in 
-			`multiagent/navigation.py`
-		observation_callback: Callable
-			Observation function for the environment. Refer `observation()` 
-			in `multiagent/navigation.py`
-		info_callback: Callable
-			Reset function for the environment. Refer `info_callback()` in 
-			`multiagent/navigation.py`
-		done_callback: Callable
-			Reset function for the environment. Refer `done()` in 
-			`multiagent/navigation.py`
-		shared_viewer: bool
-			If we want a shared viewer for rendering the environment or 
-			individual windows for each agent as the ego
-		discrete_action: bool
-			If the action space is discrete or not
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					info_callback:Callable=None,
-					done_callback:Callable=None, 
-					shared_viewer:bool=True, 
-					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentOffPolicyEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											info_callback,done_callback, 
-											shared_viewer, discrete_action,
-											scenario_name)
-	
-	def step(self, action_n:List) -> Tuple[List, List, List, List]:
-		self.current_step += 1
-		obs_n = []
-		reward_n = []
-		done_n = []
-		info_n = []
-		self.world.current_time_step += 1
-		self.agents = self.world.policy_agents
-		# set action for each agent
-		for i, agent in enumerate(self.agents):
-			self._set_action(action_n[i], agent, self.action_space[i])
-		# advance world state
-		self.world.step()
-		# record observation for each agent
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-			reward = self._get_reward(agent)
-			reward_n.append([reward])
-			done_n.append([self._get_done(agent)])
-			info = {'individual_reward': reward}
-			env_info = self._get_info(agent)
-			info.update(env_info)   # nothing fancy here, just appending dict to dict
-			info_n.append(info)
-
-		# all agents get total reward in cooperative case
-		reward = np.sum(reward_n)
-		if self.shared_reward:
-			reward_n = [[reward]] * self.n
-
-		return obs_n, reward_n, done_n, info_n
-
-	def reset(self) -> Tuple[List, Union[None, np.ndarray]]:
-		self.current_step = 0
-		# reset world
-		self.reset_callback(self.world)
-		# reset renderer
-		self._reset_render()
-		# record observations for each agent
-		obs_n = []
-		self.agents = self.world.policy_agents
-		for agent in self.agents:
-			obs_n.append(self._get_obs(agent))
-		return obs_n
-
-class MultiAgentMPNNEnv(MultiAgentOrigEnv):
-	metadata = {
-		'render.modes' : ['human', 'rgb_array']
-	}
-	""" 
-		This Environment is only for the MPNN baselines
-		discrete_action: bool
-			If the action space is discrete or not
-	"""
-	def __init__(self, world:World, reset_callback:Callable=None, 
-					reward_callback:Callable=None,
-					observation_callback:Callable=None, 
-					info_callback:Callable=None,
-					done_callback:Callable=None, 
-					shared_viewer:bool=True, 
-					discrete_action:bool=False,
-					scenario_name:str='navigation') -> None:
-		super(MultiAgentMPNNEnv, self).__init__(world, reset_callback, 
-											reward_callback,observation_callback, 
-											info_callback,done_callback, 
-											shared_viewer, discrete_action,
-											scenario_name)
-		self.discrete_action_space = True
-		self.discrete_action_input = discrete_action
 
 # vectorized wrapper for a batch of multi-agent environments
 # assumes all environments have the same observation and action space

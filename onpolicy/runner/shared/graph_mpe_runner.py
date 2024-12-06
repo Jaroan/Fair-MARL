@@ -46,11 +46,7 @@ class GMPERunner(Runner):
 			# self.active_agents = np.ones((self.n_rollout_threads, self.num_agents, self.episode_length+1),
 			# 						dtype=np.int32)
 
-			# print("masks", masks)
 
-
-			# print("Dones",dones.shape)
-			# print("activemasks are", active_masks)
 			for step in range(self.episode_length):
 				# print("\nstep", step)
 				# Sample actions
@@ -64,12 +60,10 @@ class GMPERunner(Runner):
 						dones, infos = self.envs.step(actions_env)
 					finished,finished_list = self.get_finished(dones)
 					self.active_masks[dones] = np.zeros((((dones).astype(int)).sum(), 1), dtype=np.float32)
-					# print("dones", dones)
-					# print("active_masks", self.active_masks)
+
 					dones_env = np.all(dones, axis=1)
 					self.active_masks[dones_env] = np.ones((((dones_env).astype(int)).sum(), 
 											self.num_agents, 1), dtype=np.float32)
-					# print("active_masks", self.active_masks)
 					available_actions = np.ones((self.n_rollout_threads, self.num_agents, 5), dtype=np.float32)
 
 					# # For no-Collab uncomment the line
@@ -77,28 +71,24 @@ class GMPERunner(Runner):
 					data = (obs, agent_id, node_obs, adj, agent_id, rewards, 
 							dones, infos, values, actions, action_log_probs, 
 							rnn_states, rnn_states_critic, available_actions)
-					# print("available_actions", available_actions)
+
 					# insert data into buffer
 					self.insert(data)
 				else:
-					# print("active masks", self.active_masks[:,:,0])
-					# self.active_agents[:,:,step] =  self.active_masks[:, :, 0]
-					# print("active_agents", self.active_agents[:,:,step])
+
 					ret = []
 					for e in range(self.n_rollout_threads):
 						for a in range(self.all_args.num_agents):
 							if self.active_masks[e, a,0]:
-								# print("e", e, "a", a, "self.active_masks[e, a]", self.active_masks[e, a,0])
 								ret.append((e, a, self.active_masks[e, a,0]))
 					self.active_agents = ret
-					# print("active_agents", self.active_agents)
-					# input("active_agents")
+
 					values, actions, action_log_probs, rnn_states, \
 						rnn_states_critic, actions_env, available_actions = self.collect_with_mask(step,self.active_agents,self.active_masks,finished)
     
 					obs, agent_id, node_obs, adj, rewards, \
 						dones, infos = self.envs.step(actions_env)
-					# print("dones", dones)
+
 					# Calculate the number of elements to update
 					num_elements = np.sum(dones.astype(int))
 
@@ -115,7 +105,6 @@ class GMPERunner(Runner):
 
 					finished,finished_list = self.get_finished(dones)
 
-					# self.active_masks[dones] = np.zeros((((dones).astype(int)).sum(), 1), dtype=np.float32)
 					dones_env = np.all(dones, axis=1)
 					self.active_masks[dones_env] = np.ones((((dones_env).astype(int)).sum(), 
 											self.num_agents, 1), dtype=np.float32)
@@ -142,9 +131,7 @@ class GMPERunner(Runner):
 			# log information
 			if episode % self.log_interval == 0:
 				end = time.time()
-				# print("self.log_interval",self.log_interval)
 				env_infos = self.process_infos(infos)
-				# print("self.buffer.rewards",self.buffer.rewards.T)
 				avg_ep_rew = np.mean(self.buffer.rewards) * self.episode_length
 				train_infos["average_episode_rewards"] = avg_ep_rew
 				print(f"Average episode rewards is {avg_ep_rew:.3f} \t"
@@ -172,8 +159,7 @@ class GMPERunner(Runner):
 			if episode % self.eval_interval == 0 and self.use_eval:
 				self.eval(total_num_steps)
 
-		# imageio.mimsave(str(self.gif_dir) + '/yay.gif', 
-		# 		train_frames, duration=self.all_args.ifi)
+
 
 	def warmup(self):
 		# reset env
@@ -204,7 +190,6 @@ class GMPERunner(Runner):
 
 
 	def get_finished(self,dones):
-		# print("FINISHED dones", dones.shape,dones)
 		finished=[]
 		f=[]
 		bools=[]
@@ -241,7 +226,6 @@ class GMPERunner(Runner):
 					if a in finished[env]:
 						available_actions = np.zeros((5))
 						available_actions[0] = 1
-						# print("available_actions", available_actions.shape,available_actions)
 						flag= True
 					else:
 						available_actions=np.ones((5))
@@ -251,14 +235,7 @@ class GMPERunner(Runner):
 			envs_aa.append(avail_actions_list)
 					
 		aa= np.asarray(envs_aa)
-		# print("COLLECT aa", aa.shape,aa)
-		ab = np.array([[[1., 1., 1., 1., 1.],
-  [2. ,2., 1., 1., 1.],
-  [3., 3., 1. ,1. ,1.]],
 
- [[4., 4., 1., 1., 1.],
-  [5., 5., 1., 1., 1.],
-  [6., 6., 1., 1., 1.]]])
 		value, action, action_log_prob, rnn_states, rnn_states_critic \
 			= self.trainer.policy.get_actions(
 						np.concatenate(self.buffer.share_obs[step]),
@@ -313,85 +290,6 @@ class GMPERunner(Runner):
 
 		return (values, actions, action_log_probs, rnn_states, 
 				rnn_states_critic, actions_env, avail_actions)
-	def async_compute_global_goal(self, active_agents,active_mask,finished):
-		self.trainer.prep_rollout()        
-		flag = False
-		### look and see who is active and force the avilable actions to be limited
-		# if self.check_none(finished):
-		all_actions=[]
-		aaa=[]
-		envs_aa=[]
-		for env in range(self.n_rollout_threads): #len(active_mask)):
-			aaa=[]
-			for a in range(self.all_args.num_agents):
-				# if active_mask[env][a]==True:
-				if a in finished[env]:
-					available_actions = np.zeros((5))
-					available_actions[0] = 1
-					flag= True
-				else:
-					available_actions=np.ones((5))
-				aaa.append(available_actions)
-			envs_aa.append(aaa)
-		aa= np.asarray(envs_aa)
-		concat_share_obs= np.stack([self.buffer.share_obs[step, e, a] for e, a, step in active_agents], axis=0)
-		concat_obs= np.stack([self.buffer.obs[step, e, a] for e, a, step in active_agents], axis=0)
-		if flag: ## if there are some finished agents:
-			value, action, action_log_prob, rnn_states, rnn_states_critic \
-					= self.trainer.policy.get_actions(concat_share_obs,
-													concat_obs,
-													np.stack([self.buffer.node_obs[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.adj[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.agent_id[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.share_agent_id[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.rnn_states[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.rnn_states_critic[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.masks[step, e, a] for e, a, step in active_agents], axis=0),
-													available_actions = np.stack([aa[e,a] for e,a,step in active_agents],axis=0) )
-		else:
-			value, action, action_log_prob, rnn_states, rnn_states_critic \
-					= self.trainer.policy.get_actions(concat_share_obs,
-													concat_obs,
-													np.stack([self.buffer.node_obs[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.adj[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.agent_id[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.share_agent_id[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.rnn_states[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.rnn_states_critic[step, e, a] for e, a, step in active_agents], axis=0),
-													np.stack([self.buffer.masks[step, e, a] for e, a, step in active_agents], axis=0))
-		values = np.array(np.split(_t2n(value), self.n_rollout_threads))
-		actions = np.array(np.split(_t2n(action), self.n_rollout_threads))
-		action_log_probs = np.array(np.split(_t2n(action_log_prob),
-												self.n_rollout_threads))
-		rnn_states = np.array(np.split(_t2n(rnn_states),
-									self.n_rollout_threads))
-		rnn_states_critic = np.array(np.split(_t2n(rnn_states_critic),
-												self.n_rollout_threads))
-		# rearrange action
-		if self.envs.action_space[0].__class__.__name__ == "MultiDiscrete":
-			for i in range(self.envs.action_space[0].shape):
-				uc_actions_env = np.eye(self.envs.action_space[0].high[i] +
-													1)[actions[:, :, i]]
-				if i == 0:
-					actions_env = uc_actions_env
-				else:
-					actions_env = np.concatenate((actions_env,
-													uc_actions_env), axis=2)
-		elif self.envs.action_space[0].__class__.__name__ == "Discrete":
-			actions_env = np.squeeze(np.eye(self.envs.action_space[0].n)[actions], 2)
-			
-		if flag:
-			avail_actions = aa
-		else:
-			aaa=[]
-			for env in range(len(active_mask)):
-				aa=[]
-				for a in range(len(active_mask[env])):
-					available_actions=np.ones((5))
-					aa.append(available_actions)
-				aaa.append(aa)
-			avail_actions= np.asarray(aaa)
-		return values, actions, action_log_probs, rnn_states, rnn_states_critic,actions_env, avail_actions
 
 	@torch.no_grad()
 	def collect(self, step:int) -> Tuple[arr, arr, arr, arr, arr, arr]:
@@ -439,10 +337,8 @@ class GMPERunner(Runner):
 		obs, agent_id, node_obs, adj, agent_id, rewards, dones, \
 			infos, values, actions, action_log_probs, \
 			rnn_states, rnn_states_critic, available_actions = data
-		# print("check ", dones.shape)
 
 		dones_env = np.all(dones, axis=1)
-		# print("dones in the env!!", dones_env.shape,dones_env)
 		rnn_states[dones] = np.zeros(((dones).sum(),
 												self.recurrent_N, 
 												self.hidden_size), 
@@ -453,18 +349,15 @@ class GMPERunner(Runner):
 		masks = np.ones((self.n_rollout_threads, 
 						self.num_agents, 1), 
 						dtype=np.float32)
-		# print("masks in graphMpeRunner", masks.shape)
 
 		masks[dones] = np.zeros(((dones).sum(), 1), 
 										dtype=np.float32)
-		# print("masks", masks)
 		active_masks = np.ones((self.n_rollout_threads, self.num_agents, 1),
 							   dtype=np.float32)
 		active_masks[dones] = np.zeros((((dones).astype(int)).sum(), 1), dtype=np.float32)
 		active_masks[dones_env] = np.ones((((dones_env).astype(int)).sum(), 
 								self.num_agents, 1), dtype=np.float32)
-		# print("Dones",dones.shape)
-		# print("activemasks are", active_masks)
+
 
 		# if centralized critic, then shared_obs is concatenation of obs from all agents
 		if self.use_centralized_V:
@@ -482,7 +375,6 @@ class GMPERunner(Runner):
 		else:
 			share_obs = obs
 			share_agent_id = agent_id
-		# print("runner rewards", rewards.shape)
 		self.buffer.insert(share_obs, obs, node_obs, adj, agent_id, share_agent_id, 
 						rnn_states, rnn_states_critic, actions, action_log_probs, 
 						values, rewards, masks,active_masks=active_masks,available_actions=available_actions)
@@ -599,7 +491,6 @@ class GMPERunner(Runner):
 		dists_trav_list = np.zeros((self.num_agents))
 		time_taken_list = np.zeros((self.num_agents))
 		formation_success = []
-		team_formations = []
 		time_fairness, time_stddev_param, time_mean = [], [], []
 		print("num_episodes: ", self.all_args.render_episodes)
 
@@ -609,11 +500,9 @@ class GMPERunner(Runner):
 
 
 		for episode in range(self.all_args.render_episodes):
-			# print("episode", episode)
 			obs, agent_id, node_obs, adj = envs.reset()
 			if not get_metrics:
 				if self.all_args.save_gifs:
-					# print("save gif")
 					image = envs.render('rgb_array')[0][0]
 					all_frames.append(image)
 				else:
@@ -634,19 +523,14 @@ class GMPERunner(Runner):
 			for step in range(self.episode_length):
 				# print("\nstep",step)
 				calc_start = time.time()
-				# print("Masks", masks.shape, masks)
-				# print("Available Actions", available_actions.shape, available_actions)
 
 				zero_masks = masks[0] == 0
-				# print("Zero Masks", zero_masks[:,0].shape, zero_masks[:,0])
 
 				if 	not zero_masks.all():
 					available_actions = np.ones((self.num_agents, 5), 
 										dtype=np.float32)
 				# Broadcast the boolean mask to match the shape of available_actions
 				broadcasted_zero_masks = np.broadcast_to(zero_masks, available_actions.shape)
-				# print("Broadcasted Zero Masks", broadcasted_zero_masks.shape, broadcasted_zero_masks)
-				# print(available_actions[broadcasted_zero_masks] )
 				available_actions[zero_masks[:,0]] = np.array([1, 0, 0, 0, 0])
 				self.trainer.prep_rollout()
 				action, rnn_states = self.trainer.policy.act(
@@ -679,15 +563,11 @@ class GMPERunner(Runner):
 					raise NotImplementedError
 
 				# Obser reward and next obs
-				# if actions_env.any() != None:
-				# print("actions_env[8]", actions_env[0,8])
 				obs, agent_id, node_obs, adj, \
 					rewards,dones, infos, reset_count = envs.step(actions_env)
 
-				# print("infos", infos)
-				# print("new_rewards", rewards)
 				episode_rewards.append(rewards)
-				# print("check dones ", dones.shape, dones)
+
 
 				dones_env = np.all(dones)
 				rnn_states[dones == True] = np.zeros(((dones == True).sum(), 
@@ -701,12 +581,9 @@ class GMPERunner(Runner):
 												dtype=np.float32)
 				dones_env = np.all(dones, axis=1)
 				masks[dones_env == True] = np.ones(((dones_env == True).sum(), self.num_agents, 1), dtype=np.float32)
-				# print("New Masks", masks.shape, masks)
 				if not get_metrics:
 					if self.all_args.save_gifs:
-						# print("save")
 						image = envs.render('rgb_array')[0][0]
-						# print(type(image))
 						all_frames.append(image)
 						calc_end = time.time()
 						elapsed = calc_end - calc_start
@@ -718,40 +595,27 @@ class GMPERunner(Runner):
 
 				self.reset_number += reset_count
 				if reset_count > 0:
-					# print("New EPISODE")
-					# print("infos", infos)
 					break
-				# print("reset_count", self.reset_number,"eps",self.all_args.render_episodes)
 				if self.reset_number == self.all_args.render_episodes :
-					# print("infos", infos)
 					break
-				# input("Press Enter to continue...")
-			# print("Episode Rewards", episode_rewards)
+
 			env_infos = self.process_infos(infos)
 			# print('_'*2)
 			num_collisions = self.get_collisions(env_infos)
 			frac, success,time_taken = self.get_fraction_episodes(env_infos)
-			# print("success", success)
 			if np.any(frac==1):
 				frac_max = 1.0
 			else:
 				frac_max = np.max(frac)
 			rewards_arr.append(np.mean(np.sum(np.array(episode_rewards), axis=0)))
-			# print("rewards_arr", np.sum(np.array(episode_rewards), axis=0))
 			frac_episode_arr.append(frac_max)
 			success_rates_arr.append(success)
 			num_collisions_arr.append(num_collisions)
 			fairness_metric = self.get_fairness_metric(env_infos)
 			stddev_metric = self.get_dist_std(env_infos)
-			# print("fairness_metric", fairness_metric)
-			# formation_success_values = self.get_formation_success(env_infos)
-			# # print("self.get_formation_success(env_infos)", formation_success_values)
-			# formation_success.append(formation_success_values)
-			# # print("formation_success", formation_success)
-			# team_formations.append(1 if all(value == 1.0 for value in formation_success_values) else 0)
-			# print("fairness_metric", fairness_metric[-1])
+
 			fairness_param.append(fairness_metric[-1])
-			# print("fairness_param", fairness_param)
+
 
 			stddev_param.append(1.0/(stddev_metric[-1]+0.0001))
 
@@ -762,47 +626,34 @@ class GMPERunner(Runner):
 	
 			dists_traveled = self.get_dists_traveled(env_infos)
 			dists_trav_list +=dists_traveled
-			# print("Dists traveled", dists_trav_list)
-			# time_taken = self.get_time_taken(env_infos)
+
 			time_taken_list +=time_taken
 
 			total_dists_traveled.append(np.sum(dists_traveled))
 			total_time_taken.append(np.sum(time_taken))
-			# ag1dist.append(dists_traveled[0])
-			# ag2dist.append(dists_traveled[1])
-			# ag3dist.append(dists_traveled[2])
-			# ag4dist.append(dists_traveled[3])
-			# ag1time.append(time_taken[0])
-			# ag2time.append(time_taken[1])
-			# ag3time.append(time_taken[2])
-			# ag4time.append(time_taken[3])
+
 			time_fairness_metric = self.get_time_fairness(env_infos)
 			time_stddev_metric = self.get_time_std(env_infos)
 			time_fairness.append(time_fairness_metric[-1])
 			time_stddev_param.append(1.0/(time_stddev_metric[-1]+0.0001))
-			# print("Dists traveled", dists_traveled)
-			# dists_trav_list2 = [a + b for a, b in zip(dists_trav_list, dists_traveled)]
-			# dists_trav_list = dists_trav_list2
-			# print(np.mean(frac), success)
-			# print("Average episode rewards is: " + 
-					# str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
 
 
-			# print("fairness_metric", fairness_metric[-1],"success", np.mean(success))
+
+
 			# write a row to the csv file
 			csv_data1 = [self.num_obstacles, 
-			self.num_agents,
-			self.all_args.world_size,
-			self.episode_length,
-			self.all_args.render_episodes,
-			self.reset_number, 
-			step, 
-			fairness_metric[-1],
-			np.mean(success),
-			frac_max,
-			total_dists_traveled[-1],
-			total_time_taken[-1],
-			]
+						self.num_agents,
+						self.all_args.world_size,
+						self.episode_length,
+						self.all_args.render_episodes,
+						self.reset_number, 
+						step, 
+						fairness_metric[-1],
+						np.mean(success),
+						frac_max,
+						total_dists_traveled[-1],
+						total_time_taken[-1],
+					]
 			with open('model_weights/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_fair_vs_success_new.csv', 'a', newline="") as f1:
 				# create the csv writer
 				writer = csv.writer(f1)
@@ -856,8 +707,7 @@ class GMPERunner(Runner):
 		time_mean_0_9_quantile = np.percentile(time_mean_arr, 90)
 		time_mean_maximum = np.max(time_mean_arr)
 		time_mean_mean = np.mean(time_mean_arr)
-		# print("time_mean_arr", time_mean_arr)
-		# print("Success rates", success_rates_arr)
+
 		# Convert boolean array to integers
 		# success_rates_arr = success_rates_arr.astype(int)
 		# success_rates_arr = [int(value) for value in success_rates_arr]
@@ -912,8 +762,6 @@ class GMPERunner(Runner):
 		print("Stddev 0.9 Quantile:", stddev_0_9_quantile)
 		print("Stddev Maximum:", stddev_maximum)
 		print("Stddev Mean:", stddev_mean)
-		# print("team formation_success", np.mean(team_formations))
-		# print("Formation success", np.mean(formation_success))
 		print("Dists traveled", dists_trav_list)
 		print("Time taken", time_taken_list)
 
@@ -951,12 +799,7 @@ class GMPERunner(Runner):
 		print("Total Dists Traveled Median:", total_dists_traveled_median)
 		print("Total Time Taken Median:", total_time_taken_median)
 		rewards_mean = np.mean(rewards_arr)
-		# csv_data = [self.num_obstacles, self.num_agents,self.all_args.world_size,self.episode_length ,self.all_args.render_episodes,\
-	  	# 	np.mean(fairness_param),  np.mean(frac_episode_arr), \
-		# 		np.mean(success_rates_arr), np.mean(num_collisions_arr),\
-		# 		rewards_mean, rewards_mean/self.num_agents, rewards_mean/self.num_agents/self.episode_length,\
-		# 		 np.mean(formation_success),
-		# 		dists_trav_list, time_taken_list]
+
 		csv_data = [
 			self.num_obstacles, 
 			self.num_agents,
@@ -1027,7 +870,7 @@ class GMPERunner(Runner):
 		]
 
 		# open the file in the write mode
-		with open('/Users/jasmine/Jasmine/MIT/MARL/Codes/Team-Fair-MARL/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_results_collect_new.csv', 'a', newline="") as f:
+		with open('model_weights/'+str(self.all_args.model_name)+'_firstgoaldone_nogoal_results_collect_new.csv', 'a', newline="") as f:
 			# create the csv writer
 			writer = csv.writer(f)
 
@@ -1037,7 +880,5 @@ class GMPERunner(Runner):
 		
 		if not get_metrics:
 			if self.all_args.save_gifs:
-				# print("Hello")
-				# print("gif dir", self.gif_dir)
 				imageio.mimsave(str(self.gif_dir) + '/'+str(self.all_args.model_name)+'_check'+str(self.all_args.num_agents)+'.gif', 
 								all_frames, duration=self.all_args.ifi, loop=0)

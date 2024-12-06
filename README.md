@@ -2,6 +2,10 @@
 
 This repository contains the code for the paper **"[Cooperation and Fairness in Multi-Agent Reinforcement Learning](https://dl.acm.org/doi/full/10.1145/3702012)"**, which introduces a method to incorporate fairness for multi-agent navigation tasks. The method builds on the InforMARL framework and extends it to ensure fair cooperation in scenarios like MPE's simple spread (coverage) and formation.
 
+Paper Link: :page_facing_up: :paperclip: [https://arxiv.org/abs/2410.14916](https://arxiv.org/abs/2410.14916)
+
+Paper Website: :computer: :globe_with_meridians: [Website](https://jaroan.github.io/jasminejerrya/Fair_MARL.html)
+
 ## Table of Contents
 - [Introduction](#introduction)
 - [Features](#features)
@@ -37,16 +41,23 @@ You can find the MPE environment here: [Multi-Agent Particle Environment (MPE)](
 
 ## Installation
 
-To get started with the Fair-MARL method, clone this repository and install the required dependencies:
+To get started with the Fair-MARL method, clone this repository and install the required dependencies. Ensure you have pip version pip==23.1.2. Installing torch beforehand ensures the correct installation of other components.:
 
 ```bash
 git clone https://github.com/yourusername/fair-marl.git
 cd fair-marl
+pip install torch==2.0.1
 pip install -r requirements.txt
 ```
 
+> NOTE: Using a conda environment is preferred. Please use the following command to create a conda environment with the correct python version.
+
+```
+conda create -n fairmarl python=3.11
+```
+
 ### Dependencies
-- Python 3.10+
+- Python 3.11+
 - PyTorch
 - OpenAI Gym
 - Multi-Agent Particle Environment (MPE)
@@ -143,12 +154,34 @@ If you find this repository helpful in your research, please cite the correspond
   author={Aloor, Jasmine and Nayak, Siddharth Nagar and Dolan, Sydney and Balakrishnan, Hamsa},
   journal={Journal on Autonomous Transportation Systems},
   year={2024},
-  publisher={ACM New York, NY}
+  publisher={ACM New York, NY},
+  doi={10.1145/3702012}
 }
 
 ```
 
-## Acknowledgements
+## Troubleshooting
 
+1. Known issues with pytorch geometric and torch-scatter packege installation. Please refer to the requirements.txt to note the versions being used in the code.
+ Correct order of installation of Pytorch Geometric packages if encountering any errors:
+ ```bash
+    pip install --verbose git+https://github.com/pyg-team/pyg-lib.git
+    pip install --verbose torch_scatter
+    pip install --verbose torch_sparse
+    pip install --verbose torch_cluster
+    pip install --verbose torch_spline_conv
+```
+2. Rendering issues with Linux users: Follow the instructions to access display for the visualization of evaluation tests.
 
-### Related papers
+## Questions/Requests
+
+Please file an issue if you have any questions or requests about the code or the paper. If you prefer your question to be private, you can alternatively email me at jjaloor@mit.edu
+
+## Related papers
+
+1. InforMARL: [https://nsidn98.github.io/InforMARL/](https://nsidn98.github.io/InforMARL/) Paper: [Scalable Multi-Agent Reinforcement Learning through Intelligent Information Aggregation](https://arxiv.org/abs/2211.02127)
+2. [Satellite Navigation and Coordination with Limited Information Sharing](https://arxiv.org/abs/2211.03658)
+
+## Contributing
+
+We would be happy to accept PRs that help extend or improve this work.
