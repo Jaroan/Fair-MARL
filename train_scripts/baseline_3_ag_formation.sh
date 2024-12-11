@@ -11,11 +11,11 @@
 ## SBATCH -c 40 # cpus per task
 
 ##export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-module unload anaconda/2023b
+# module unload anaconda/2022a
 # Loading the required module
 source /etc/profile
-module load anaconda/2022a
-export LD_LIBRARY_PATH=/state/partition1/llgrid/pkg/anaconda/anaconda3-2022a/lib:$LD_LIBRARY_PATH
+module load anaconda/2023b
+## export LD_LIBRARY_PATH=/state/partition1/llgrid/pkg/anaconda/anaconda3-2022a/lib:$LD_LIBRARY_PATH
 
 logs_folder="out_informarl3"
 mkdir -p $logs_folder
@@ -33,7 +33,7 @@ seeds=(0 1)
 # echo "seed: ${seed}"
 # execute the script with different params
 python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
---project_name "new_gnn_${n_agents}" \
+--project_name "speedup_efficiency_tests_${n_agents}" \
 --env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seeds[$SLURM_ARRAY_TASK_ID]} \
@@ -64,7 +64,7 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 # --algorithm_name "rmappo" \
 # --seed 3 \
 # --experiment_name "base_mingoalobs_mingoalgraphobs_formation_collab_10goal" \
-# --scenario_name "nav_base_formation_graph" \
+# --scenario_name "nav_base_formation_graph_mask" \
 # --num_agents=3 \
 # --collision_rew 7 \
 # --n_training_threads 1 --n_rollout_threads 2 \
