@@ -81,7 +81,7 @@ def modify_args(model_dir:str,
                                 'seed', 'save_gifs', 'use_render', 'episode_length',
                                 'use_dones', 'goal_rew','collaborative', 
                                 'min_dist_thresh', 'scenario_name','fair_rew','model_name',
-                                'num_walls','zero_shift','min_obs_dist','max_edge_dist']):
+                                'num_walls','zero_shift','min_obs_dist','max_edge_dist','total_actions']):
     """
         Modify the args used to train the model
     """

@@ -1,11 +1,12 @@
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA_FR' \
+--model_dir='model_weights/FA_FR/actions_9' \
 --render_episodes=2 \
 --world_size=3 \
 --num_agents=3 \
 --num_obstacles=0 \
 --seed=0 \
 --num_landmarks=3 \
+--total_actions 9 \
 --episode_length=50 \
 --use_dones=False \
 --collaborative=False --model_name='FA_FR' \

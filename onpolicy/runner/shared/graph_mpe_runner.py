@@ -525,15 +525,14 @@ class GMPERunner(Runner):
 				calc_start = time.time()
 
 				zero_masks = masks[0] == 0
-
 				if 	not zero_masks.all():
 					available_actions = np.ones((self.num_agents, self.envs.action_space[0].n), 
 										dtype=np.float32)
 				# Broadcast the boolean mask to match the shape of available_actions
 				broadcasted_zero_masks = np.broadcast_to(zero_masks, available_actions.shape)
-				# TODO: This is a hack to make the stop action available when the agent is done
+				# TODO: This is a hack to make only the stop action available when the agent is done
 				stop_mask = np.zeros(self.envs.action_space[0].n)
-				stop_mask[int(self.envs.action_space[0].n/2)] = 1
+				stop_mask[0] = 1 # determine which action is the stop action in teh action array
 				available_actions[zero_masks[:,0]] = stop_mask
 				self.trainer.prep_rollout()
 				action, rnn_states = self.trainer.policy.act(
@@ -580,6 +579,7 @@ class GMPERunner(Runner):
 				masks = np.ones((self.n_rollout_threads, 
 								self.num_agents, 1), 
 								dtype=np.float32)
+				
 				masks[dones == True] = np.zeros(((dones == True).sum(), 1), 
 												dtype=np.float32)
 				dones_env = np.all(dones, axis=1)
