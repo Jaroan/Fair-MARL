@@ -172,6 +172,10 @@ def get_config():
     parser = argparse.ArgumentParser(
         description='onpolicy', formatter_class=argparse.RawDescriptionHelpFormatter)
 
+    ## action space params
+    parser.add_argument("--total_actions", type=int,
+                        default=5,help="choice of action space")    
+
     ## fairness params
     parser.add_argument("--fair_wt", type=int,
                         default=1,help="choice of weight")

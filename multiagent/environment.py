@@ -121,10 +121,9 @@ class MultiAgentBaseEnv(gym.Env):
 		else:
 			for agent in world.agents:
 				total_action_space = []
-
 				# physical action space
 				if self.discrete_action_space:
-					u_action_space = spaces.Discrete(world.dim_p * 2 + 1)
+					u_action_space = spaces.Discrete(world.total_actions)
 				else:
 					u_action_space = spaces.Box(low=-agent.u_range, 
 												high=+agent.u_range, 
@@ -272,21 +271,49 @@ class MultiAgentBaseEnv(gym.Env):
 			# physical action
 			# print(f'discrete_action_input: {self.discrete_action_input}, force_discrete_action: {self.force_discrete_action}, discrete_action_space: {self.discrete_action_space}')
 			if self.discrete_action_input:
-				# print("Discrete action input",self.discrete_action_input)
 				agent.action.u = np.zeros(self.world.dim_p)
-				# process discrete action
-				if action[0] == 1: agent.action.u[0] = -1.0
-				if action[0] == 2: agent.action.u[0] = +1.0
-				if action[0] == 3: agent.action.u[1] = -1.0
-				if action[0] == 4: agent.action.u[1] = +1.0
+				if self.world.total_actions ==5:
+					# process discrete action
+					if action[0] == 1: agent.action.u[0] = -1.0
+					if action[0] == 2: agent.action.u[0] = +1.0
+					if action[0] == 3: agent.action.u[1] = -1.0
+					if action[0] == 4: agent.action.u[1] = +1.0
+				elif self.world.total_actions ==9:
+					# update action space for 9 actions using the 8 cardinal directions
+					if action[0] == 1: agent.action.u[0] = -1.0	# left
+					if action[0] == 2: agent.action.u[0] = -0.71; agent.action.u[1] = -0.71	# left-down
+					if action[0] == 3: agent.action.u[1] = -1.0	# down
+					if action[0] == 4: agent.action.u[0] = +0.71; agent.action.u[1] = -0.71	# right-down
+
+					if action[0] == 5: agent.action.u[0] = +1.0	# right
+					if action[0] == 6: agent.action.u[0] = +0.71; agent.action.u[1] = +0.71	# right-up
+					if action[0] == 7: agent.action.u[1] = +1.0	# up
+					if action[0] == 8: agent.action.u[0] = -0.71; agent.action.u[1] = +0.71	# left-up
+
+
 			else:
+				action_map = np.array([
+									[0.0, 0.0],       # Action 0: No movement
+									[-1.0, 0.0],      # Action 1: Left
+									[-0.71, -0.71],   # Action 2: Left-Down
+									[0.0, -1.0],      # Action 3: Down
+									[0.71, -0.71],    # Action 4: Right-Down
+									[1.0, 0.0],       # Action 5: Right
+									[0.71, 0.71],     # Action 6: Right-Up
+									[0.0, 1.0],       # Action 7: Up
+									[-0.71, 0.71]     # Action 8: Left-Up
+								])
 				if self.force_discrete_action:
 					d = np.argmax(action[0])
 					action[0][:] = 0.0
 					action[0][d] = 1.0
 				if self.discrete_action_space:
-					agent.action.u[0] += action[0][1] - action[0][2]
-					agent.action.u[1] += action[0][3] - action[0][4]
+					if len(action[0]) == 5:
+						agent.action.u[0] += action[0][1] - action[0][2]
+						agent.action.u[1] += action[0][3] - action[0][4]
+					elif len(action[0]) == 9:
+						active_action = np.argmax(action[0])  # find the index of the selected action
+						agent.action.u = action_map[active_action]
 				else:
 					agent.action.u = action[0]
 			sensitivity = 5.0
@@ -621,7 +648,6 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 		cooperate_n, defect_n = [], []
 		self.world.current_time_step += 1
 		self.agents = self.world.policy_agents
-		# print("action_n",len(action_n),action_n)
 		# set action for each agent
 		for i, agent in enumerate(self.agents):
 			self._set_action(action_n[i], agent, self.action_space[i])

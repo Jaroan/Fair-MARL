@@ -114,6 +114,7 @@ class Scenario(BaseScenario):
 		self.fair_rew = args.fair_rew
 
 
+
 		# create heatmap matrix to determine the goal agent pairs
 		self.goal_reached = -1*np.ones(self.num_agents)
 		self.wrong_goal_reached = np.zeros(self.num_agents)
@@ -145,7 +146,10 @@ class Scenario(BaseScenario):
 		self.num_landmarks = args.num_landmarks # no. of goals equal to no. of agents
 		num_scripted_agents_goals = self.num_scripted_agents
 		world.collaborative = args.collaborative
-
+		#############
+		## determine the number of actions from arguments
+		world.total_actions = args.total_actions
+		#############
 		# add agents
 		global_id = 0
 		world.agents = [Agent() for i in range(self.num_agents)]

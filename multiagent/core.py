@@ -175,6 +175,11 @@ class World(object):
         self.cached_dist_vect = None
         self.cached_dist_mag = None
 
+        #############
+		## determine the number of actions from arguments
+        self.total_actions = 9 # default is 5 actions  [None, ←, →, ↓, ↑]
+		#############
+
     # return all entities in the world
     @property
     def entities(self):

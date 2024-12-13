@@ -15,7 +15,7 @@
 # module unload anaconda/2022a
 # Loading the required module
 source /etc/profile
-module load anaconda/2023b
+module load anaconda/2023a
 # export LD_LIBRARY_PATH=/state/partition1/llgrid/pkg/anaconda/anaconda3-2022a/lib:$LD_LIBRARY_PATH
 
 logs_folder="out_fair_informarl3"
@@ -61,6 +61,7 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --n_training_threads 1 --n_rollout_threads 128 \
 --num_mini_batch 1 \
 --episode_length 25 \
+--total_actions 9 \
 --num_env_steps 5000000 \
 --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 \
 --user_name "marl" \

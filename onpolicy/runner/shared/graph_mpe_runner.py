@@ -64,7 +64,8 @@ class GMPERunner(Runner):
 					dones_env = np.all(dones, axis=1)
 					self.active_masks[dones_env] = np.ones((((dones_env).astype(int)).sum(), 
 											self.num_agents, 1), dtype=np.float32)
-					available_actions = np.ones((self.n_rollout_threads, self.num_agents, 5), dtype=np.float32)
+
+					available_actions = np.ones((self.n_rollout_threads, self.num_agents, self.envs.action_space[0].n), dtype=np.float32)
 
 					# # For no-Collab uncomment the line
 					rewards = rewards[:,:, np.newaxis]
@@ -224,11 +225,11 @@ class GMPERunner(Runner):
 				# if active_mask[env][a]==True:
 				
 					if a in finished[env]:
-						available_actions = np.zeros((5))
+						available_actions = np.zeros((self.envs.action_space[0].n))
 						available_actions[0] = 1
 						flag= True
 					else:
-						available_actions=np.ones((5))
+						available_actions=np.ones((self.envs.action_space[0].n))
 						
 					avail_actions_list.append(available_actions)
 					
@@ -247,8 +248,7 @@ class GMPERunner(Runner):
 						np.concatenate(self.buffer.rnn_states[step]),
 						np.concatenate(self.buffer.rnn_states_critic[step]),
 						np.concatenate(self.buffer.masks[step]),
-						available_actions = np.reshape(aa, (self.all_args.num_agents*self.n_rollout_threads, 5), order='C'))
-
+						available_actions = np.reshape(aa, (self.all_args.num_agents*self.n_rollout_threads, self.envs.action_space[0].n), order='C'))
 		values = np.array(np.split(_t2n(value), self.n_rollout_threads))
 		actions = np.array(np.split(_t2n(action), self.n_rollout_threads))
 		action_log_probs = np.array(np.split(_t2n(action_log_prob), 
@@ -281,7 +281,7 @@ class GMPERunner(Runner):
 			for env in range(len(active_masks)):
 				aa=[]
 				for a in range(len(active_masks[env])):
-					available_actions=np.ones((5))
+					available_actions=np.ones((self.envs.action_space[0].n))
 					aa.append(available_actions)
 				avail_actions_list.append(aa)
 
@@ -516,7 +516,7 @@ class GMPERunner(Runner):
 			masks = np.ones((self.n_rollout_threads, 
 							self.num_agents, 1), 
 							dtype=np.float32)
-			available_actions = np.ones((self.num_agents, 5), 
+			available_actions = np.ones((self.num_agents, self.envs.action_space[0].n), 
 										dtype=np.float32)
 			episode_rewards = []
 			
@@ -527,11 +527,14 @@ class GMPERunner(Runner):
 				zero_masks = masks[0] == 0
 
 				if 	not zero_masks.all():
-					available_actions = np.ones((self.num_agents, 5), 
+					available_actions = np.ones((self.num_agents, self.envs.action_space[0].n), 
 										dtype=np.float32)
 				# Broadcast the boolean mask to match the shape of available_actions
 				broadcasted_zero_masks = np.broadcast_to(zero_masks, available_actions.shape)
-				available_actions[zero_masks[:,0]] = np.array([1, 0, 0, 0, 0])
+				# TODO: This is a hack to make the stop action available when the agent is done
+				stop_mask = np.zeros(self.envs.action_space[0].n)
+				stop_mask[int(self.envs.action_space[0].n/2)] = 1
+				available_actions[zero_masks[:,0]] = stop_mask
 				self.trainer.prep_rollout()
 				action, rnn_states = self.trainer.policy.act(
 													np.concatenate(obs),
