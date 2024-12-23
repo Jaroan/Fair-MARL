@@ -41,20 +41,24 @@ You can find the MPE environment here: [Multi-Agent Particle Environment (MPE)](
 
 ## Installation
 
-To get started with the Fair-MARL method, clone this repository and install the required dependencies. Ensure you have pip version pip==23.1.2. Installing torch beforehand ensures the correct installation of other components.:
-
-```bash
-git clone https://github.com/yourusername/fair-marl.git
-cd fair-marl
-pip install torch==2.0.1
-pip install -r requirements.txt
-```
+To get started with the Fair-MARL method, clone this repository and install the required dependencies. Ensure you have pip version pip==23.1.2. Installing torch beforehand ensures the correct installation of other components.
 
 > NOTE: Using a conda environment is preferred. Please use the following command to create a conda environment with the correct python version.
 
 ```
 conda create -n fairmarl python=3.11
+conda activate fairmarl
 ```
+
+```bash
+git clone https://github.com/yourusername/fair-marl.git
+cd fair-marl
+pip install pip==23.1.2
+pip install torch==2.0.1
+pip install -r requirements.txt
+```
+
+
 
 ### Dependencies
 - Python 3.11+
