@@ -84,7 +84,9 @@ python -u onpolicy/scripts/train_mpe.py \
 
 This will train agents using the Fair-MARL method on the chosen task (`navigation_graph` in this case). Additional parameters for training, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
 
-> NOTE: Please note that for training we have enabled wandb logging by default. Please inspect your logging mechanishm or use the flag `--use_wandb` to prevent wandb longging.
+> NOTE 1: Please note that for training we have enabled wandb logging by default. Please inspect your logging mechanishm or use the flag `--use_wandb` to prevent wandb longging.
+
+> NOTE 2a: Training any of the fairness aware models will require access to Gurobi optimization software. Please install it in your environment.
 
 ### Evaluation
 
@@ -114,6 +116,9 @@ python onpolicy/scripts/eval_mpe.py \
 ```
 
 This will load the trained model and evaluate its performance in the specified environment. Additional parameters for evaluation, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.
+
+> NOTE 2b: Training any of the fairness aware models will require access to Gurobi optimization software. Please install it in your environment.
+
 
 ## Code Structure
 
