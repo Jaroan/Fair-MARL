@@ -109,7 +109,8 @@ python onpolicy/scripts/eval_mpe.py \
 --use_render \
 --num_walls=0 \
 --zeroshift=5 \
---min_obs_dist 0.5
+--min_obs_dist 0.5 \
+--total_actions 5
 ```
 
 This will load the trained model and evaluate its performance in the specified environment. Additional parameters for evaluation, such as the number of agents, can be modified in the configuration file or passed as command-line arguments.

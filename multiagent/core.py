@@ -129,7 +129,7 @@ class Agent(Entity):
 
 # multi-agent world
 class World(object):
-    def __init__(self):
+    def __init__(self, total_actions: int = 5):
         # if we want to construct graphs with the entities 
         self.graph_mode = False
         self.edge_list = None
@@ -177,7 +177,7 @@ class World(object):
 
         #############
 		## determine the number of actions from arguments
-        self.total_actions = 9 # default is 5 actions  [None, ←, →, ↓, ↑]
+        self.total_actions = total_actions # default is 5 actions  [None, ←, →, ↓, ↑]
 		#############
 
     # return all entities in the world

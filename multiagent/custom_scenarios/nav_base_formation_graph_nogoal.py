@@ -81,6 +81,7 @@ class Scenario(BaseScenario):
 		self.min_obs_dist = args.min_obs_dist
 		self.use_dones = args.use_dones
 		self.episode_length = args.episode_length
+		self.total_actions = args.total_actions
 
 		# fairness args
 		# self.fair_wt = args.fair_wt
@@ -100,7 +101,7 @@ class Scenario(BaseScenario):
 		else:
 			self.max_edge_dist = args.max_edge_dist
 		####################
-		world = World()
+		world = World(total_actions=self.total_actions)
 		# graph related attributes
 		world.cache_dists = True # cache distance between all entities
 		world.graph_mode = True
