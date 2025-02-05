@@ -49,7 +49,8 @@ def MPEEnv(args:argparse.Namespace):
                             observation_callback=scenario.observation,
                             info_callback=scenario.info_callback if 
                             hasattr(scenario, 'info_callback') else None,
-                            scenario_name=args.scenario_name)
+                            scenario_name=args.scenario_name,
+                            dynamics_type=args.dynamics_type)
     return env
 
 def GraphMPEEnv(args):
@@ -72,7 +73,8 @@ def GraphMPEEnv(args):
                         id_callback=scenario.get_id,
                         info_callback=scenario.info_callback,
                         done_callback=scenario.done,
-                        scenario_name=args.scenario_name)
+                        scenario_name=args.scenario_name,
+                        dynamics_type=args.dynamics_type)
 
     return env
 

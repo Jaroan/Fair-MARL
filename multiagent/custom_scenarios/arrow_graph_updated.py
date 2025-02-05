@@ -9,17 +9,16 @@ import argparse
 import numpy as np
 from numpy import ndarray as arr
 from scipy import sparse
-
-import scipy.spatial.distance as dist
+# import pyomo.environ as pe
+# import scipy.spatial.distance as dist
 import os,sys
 sys.path.append(os.path.abspath(os.getcwd()))
-
-from multiagent.core import EntityDynamicsType, World, Agent, Landmark, Entity, Wall
-from multiagent.scenario import BaseScenario
-from multiagent.config import UnicycleVehicleConfig, DoubleIntegratorConfig
 from scipy.optimize import linear_sum_assignment
-from multiagent.custom_scenarios.utils import *
-from marl_fair_assign import solve_fair_assignment
+
+from multiagent.core import World, Agent, Landmark, Entity, Wall
+from multiagent.scenario import BaseScenario
+
+# from marl_fair_assign import solve_fair_assignment
 
 entity_mapping = {'agent': 0, 'landmark': 1, 'obstacle':2, 'wall':3}
 
@@ -39,12 +38,6 @@ def find_angle(pose):
 	if angle < 0:
 		angle += 2 * np.pi
 	return angle
-
-
-def leaky_ReLU(x):
-  data = np.max(max(0.01*x,x))
-  return np.array(data, dtype=float)
-
 
 class Scenario(BaseScenario):
 	def make_world(self, args:argparse.Namespace) -> World:
@@ -93,8 +86,7 @@ class Scenario(BaseScenario):
 				Maximum distance to consider to connect the nodes in the graph
 		"""
 		# pull params from args
-		if not hasattr(self, 'world_size'):
-			self.world_size = args.world_size
+		self.world_size = args.world_size
 		self.num_agents = args.num_agents
 		self.num_scripted_agents = args.num_scripted_agents
 		self.num_obstacles = args.num_obstacles
@@ -104,53 +96,35 @@ class Scenario(BaseScenario):
 		self.goal_rew = args.goal_rew
 		self.min_dist_thresh = args.min_dist_thresh
 		self.min_obs_dist = args.min_obs_dist
-
 		self.use_dones = args.use_dones
 		self.episode_length = args.episode_length
-		self.target_radius = 0.5  # fixing the target radius for now
+		self.target_radius = 0.1  # fixing the target radius for now
 		self.ideal_theta_separation = (
 			2 * np.pi
 		) / self.num_agents  # ideal theta difference between two agents
-
+		self.identity_size = 0
+		self.goal_match_index = np.arange(self.num_agents)
 		# fairness args
 		self.fair_wt = args.fair_wt
 		self.fair_rew = args.fair_rew
-
-
 
 		# create heatmap matrix to determine the goal agent pairs
 		self.goal_reached = -1*np.ones(self.num_agents)
 		self.wrong_goal_reached = np.zeros(self.num_agents)
 		self.goal_matched = np.zeros(self.num_agents)
-		if args.dynamics_type == 'unicycle_vehicle':
-			self.dynamics_type = EntityDynamicsType.UnicycleVehicleXY
-			self.config_class = UnicycleVehicleConfig
-			self.min_turn_radius = 0.5 * (UnicycleVehicleConfig.V_MAX + UnicycleVehicleConfig.V_MIN) / UnicycleVehicleConfig.ANGULAR_RATE_MAX
+		self.agent_dist_traveled = np.zeros(self.num_agents)
+		self.agent_time_taken = np.zeros(self.num_agents)
 
-		elif args.dynamics_type == 'double_integrator':
-			self.dynamics_type = EntityDynamicsType.DoubleIntegratorXY
-			self.config_class = DoubleIntegratorConfig
-			self.min_turn_radius = 0.0
+		if not hasattr(args, 'max_edge_dist'):
+			self.max_edge_dist = 1
+			print('_'*60)
+			print(f"Max Edge Distance for graphs not specified. "
+					f"Setting it to {self.max_edge_dist}")
+			print('_'*60)
 		else:
-			raise NotImplementedError
-		self.coordination_range = self.config_class.COMMUNICATION_RANGE
-		self.min_dist_thresh = self.config_class.DISTANCE_TO_GOAL_THRESHOLD
-		self.separation_distance = self.config_class.COLLISION_DISTANCE
-
-
-		# scripted agent dynamics are fixed to double integrator for now (as it was originally)
-		scripted_agent_dynamics_type = EntityDynamicsType.DoubleIntegratorXY
-		# if not hasattr(args, 'max_edge_dist'):
-		# 	self.max_edge_dist = 1
-		# 	print('_'*60)
-		# 	print(f"Max Edge Distance for graphs not specified. "
-		# 			f"Setting it to {self.max_edge_dist}")
-		# 	print('_'*60)
-		# else:
-		# 	self.max_edge_dist = args.max_edge_dist
-		self.max_edge_dist = self.coordination_range
+			self.max_edge_dist = args.max_edge_dist
 		####################
-		world = World(dynamics_type=self.dynamics_type)
+		world = World()
 		# graph related attributes
 		world.cache_dists = True # cache distance between all entities
 		world.graph_mode = True
@@ -164,16 +138,14 @@ class Scenario(BaseScenario):
 		# set any world properties
 		world.dim_c = 2
 		self.num_landmarks = args.num_landmarks # no. of goals equal to no. of agents
+		# print("num_landmarks",self.num_landmarks)
 		num_scripted_agents_goals = self.num_scripted_agents
 		world.collaborative = args.collaborative
-		#############
-		## determine the number of actions from arguments
-		world.total_actions = args.total_actions
-		#############
+
 		# add agents
 		global_id = 0
-		world.agents = [Agent(self.dynamics_type) for i in range(self.num_agents)]
-		world.scripted_agents = [Agent(scripted_agent_dynamics_type) for _ in range(self.num_scripted_agents)]
+		world.agents = [Agent() for i in range(self.num_agents)]
+		world.scripted_agents = [Agent() for _ in range(self.num_scripted_agents)]
 		for i, agent in enumerate(world.agents + world.scripted_agents):
 			agent.id = i
 			agent.name = f'agent {i}'
@@ -206,8 +178,10 @@ class Scenario(BaseScenario):
 		## add wall
 		# num obstacles per wall is twice the length of the wall
 		wall_length = np.random.uniform(0.2, 0.4)
+		# print("wall_length",wall_length)
 		self.wall_length = wall_length * self.world_size/4
-
+		self.num_obstacles_per_wall = np.int32(1*self.wall_length/world.agents[0].size)
+		# print("num_obstacles_per_wall",self.num_obstacles_per_wall)
 		self.num_walls = args.num_walls
 		world.walls = [Wall() for i in range(self.num_walls)]
 		for i, wall in enumerate(world.walls):
@@ -217,19 +191,16 @@ class Scenario(BaseScenario):
 			wall.movable = False
 			wall.global_id = global_id
 			global_id += 1
+		# num_walls = 1
 
-			
-		self.zeroshift = args.zeroshift
+		# make initial conditions
 		self.reset_world(world)
-		world.world_size = self.world_size
-		# world.world_aspect_ratio = self.world_aspect_ratio
 		return world
 
 	def reset_world(self, world:World) -> None:
-
+		# print("reset_world")
 		# metrics to keep track of
 		world.current_time_step = 0
-		world.simulation_time = 0.0
 		# to track time required to reach goal
 		world.times_required = -1 * np.ones(self.num_agents)
 		world.dists_to_goal = -1 * np.ones(self.num_agents)
@@ -242,15 +213,18 @@ class Scenario(BaseScenario):
 		world.num_agent_collisions = np.zeros(self.num_agents)
 		world.agent_dist_traveled = np.zeros(self.num_agents)
 
-		self.goal_match_index = np.arange(self.num_agents)
+		world.formation_dist = np.zeros(self.num_agents)
+		self.agent_dist_traveled = np.zeros(self.num_agents)
+		self.agent_time_taken = np.zeros(self.num_agents)
+		world.formation_complete = np.zeros(self.num_agents)
+
 		self.goal_history = -1*np.ones((self.num_agents))
 		self.goal_reached = -1*np.ones(self.num_agents)
 
-		self.agent_dist_traveled = np.zeros(self.num_agents)
-		self.agent_time_taken = np.zeros(self.num_agents)
+		self.optimal_match_index = np.arange(self.num_agents)
 		wall_length = np.random.uniform(0.2, 0.8)
+		# print("wall_length",wall_length)
 		self.wall_length = wall_length * self.world_size/4
-
 
 
 
@@ -258,16 +232,12 @@ class Scenario(BaseScenario):
 		# set colours for agents
 		for i, agent in enumerate(world.agents):
 			agent.color = np.array([0.85, 0.35, 0.35])
-			if i%4 == 0:
+			if i%3 == 0:
 				agent.color = np.array([0.85, 0.35, 0.35])
-			elif i%4 == 1:
+			elif i%3 == 1:
 				agent.color = np.array([0.35, 0.85, 0.35])
-			elif i%4 == 2:
-				agent.color = np.array([0.35, 0.35, 0.85])
 			else:
-				agent.color = np.array([0.85, 0.85, 0.25])
-			if i == 0:
-				agent.color = np.array([0.15, 0.75, 0.65])
+				agent.color = np.array([0.35, 0.35, 0.85])
 			agent.state.p_dist = 0.0
 			agent.state.time = 0.0
 		# set colours for scripted agents
@@ -275,16 +245,12 @@ class Scenario(BaseScenario):
 			agent.color = np.array([0.15, 0.15, 0.15])
 		# set colours for landmarks
 		for i, landmark in enumerate(world.landmarks):
-			if i%4 == 0:
+			if i%3 == 0:
+				landmark.color = np.array([0.35, 0.35, 0.35])
+			elif i%3 == 1:
 				landmark.color = np.array([0.85, 0.35, 0.35])
-			elif i%4 == 1:
-				landmark.color = np.array([0.35, 0.85, 0.35])
-			elif i%4 == 2:
-				landmark.color =  np.array([0.35, 0.35, 0.85])
 			else:
-				landmark.color = np.array([0.85, 0.85, 0.25])
-			if i == 0:
-				landmark.color = np.array([0.15, 0.75, 0.65])
+				landmark.color = np.array([0.35, 0.85, 0.35])
 		# set colours for scripted agents goals
 		for i, landmark in enumerate(world.scripted_agents_goals):
 			landmark.color = np.array([0.15, 0.95, 0.15])
@@ -296,12 +262,12 @@ class Scenario(BaseScenario):
 		# 	wall_obstacle.color = np.array([0.25, 0.25, 0.25])
 		#####################################################
 		self.random_scenario(world)
-		self.initialize_min_time_distance_graph(world)
 
 	def random_scenario(self, world):
 		"""
 			Randomly place agents and landmarks
 		"""
+		# print("random_scenario")
 		####### set random positions for entities ###########
 		# set random static obstacles first
 		for obstacle in world.obstacles:
@@ -312,16 +278,23 @@ class Scenario(BaseScenario):
 		#####################################################
 
 
+
+
 		############## create wall positions #################
 		wall_position = np.random.uniform(0.2, 0.9)
 		wall_axis  = np.array([wall_position * self.world_size/2, -wall_position * self.world_size/2])
 								# wall_position * self.world_size/2, -wall_position * self.world_size/2])
 		wall_obst_count = 0
+		# print("wall_obst_count",wall_obst_count)
 		# set wall positions
 		for i , wall in enumerate(world.walls):
-
+			# print("wall",i)
+			# wall.orient='V'
 			#select wall orientation randomly for every episode
 			wall.orient = np.random.choice(['H','V'])
+			# if i<2:
+			# 	wall.orient='H'
+
 			wall.width = 0.1
 			wall.hard = True
 			wall.endpoints=np.array([-self.wall_length, self.wall_length])
@@ -336,141 +309,218 @@ class Scenario(BaseScenario):
 
 			elif wall.orient == 'V':
 				# Vertical wall
+				# print("wall",i)
 				x = wall.axis_pos
 				y_min, y_max = wall.endpoints
 				y = (y_min + y_max) / 2
 				wall.state.p_pos = np.array([x, y])  # Set the physical position
 				wall.state.p_vel = np.zeros(world.dim_p)  # Set the physical velocity
 
-
 		#####################################################
+
+
 
 
 		# set agents at random positions not colliding with obstacles
 		num_agents_added = 0
 		agents_added = []
 		boundary_thresh = 0.9
+		# uniform_pos = np.linspace(-boundary_thresh*self.world_size/2, boundary_thresh*self.world_size/2, self.num_agents)
+		# print("uni",uniform_pos)
+
+		# print("HI")
+		# # circle arrangement
+		# agent_theta = np.linspace(0, 2*np.pi, self.num_agents, endpoint=False)
+		# # print("theta",agent_theta)
+		# radius = 0.92 * self.world_size/2
 
 		while True:
+			# print(uniform_pos)
 			if num_agents_added == self.num_agents:
 				break
-			# for random pos
+			# # for random pos
 			random_pos = np.random.uniform(-self.world_size/2, 
 											self.world_size/2, 
 											world.dim_p)
+			line_pos = random_pos
+			### print("random pos",line_pos)
 
 
 			agent_size = world.agents[num_agents_added].size
-			obs_collision = self.is_obstacle_collision(random_pos, agent_size, world)
+			obs_collision = self.is_obstacle_collision(line_pos, agent_size, world)
 			# goal_collision = self.is_goal_collision(uniform_pos, agent_size, world)
 
-			agent_collision = self.check_agent_collision(random_pos, agent_size, agents_added)
+			agent_collision = self.check_agent_collision(line_pos, agent_size, agents_added)
+			# print("obs_collision",obs_collision,"agent_collision",agent_collision)
 			if not obs_collision and not agent_collision:
-				world.agents[num_agents_added].state.p_pos = random_pos
-				world.agents[num_agents_added].state.reset_velocity()
+				world.agents[num_agents_added].state.p_pos = line_pos
+				world.agents[num_agents_added].state.p_vel = np.zeros(world.dim_p)
 				world.agents[num_agents_added].state.c = np.zeros(world.dim_c)
 				world.agents[num_agents_added].status = False
 				agents_added.append(world.agents[num_agents_added])
 				num_agents_added += 1
+			# print(num_agents_added)
 		agent_pos = [agent.state.p_pos for agent in world.agents]
-		#####################################################
-		
+
 
 		# set landmarks (goals) at random positions not colliding with obstacles 
 		# and also check collisions with already placed goals
 		num_goals_added = 0
-
+		# goals_added = []
+		# uniform_pos = np.linspace(0, boundary_thresh*self.world_size/2, self.num_agents)
+		# angle_shift = np.pi/self.num_agents
+		# goal_theta = np.linspace(0+angle_shift, 2*np.pi+angle_shift, self.num_agents, endpoint=False)
+		# # print("goal_theta",goal_theta)
+		# goal_radius = 0.45 * self.world_size/2
+		# print("self.num_landmarks",self.num_landmarks)
 		while True:
 			if num_goals_added == self.num_landmarks:
 				break
 
-			# for random pos
-			random_pos = 0.8 * np.random.uniform(-self.world_size/2, 
-												self.world_size/2, 
-												world.dim_p)
+
+			# # for random pos
+			# random_pos = 0.5 * np.random.uniform(-self.world_size/2, 
+			# 									self.world_size/2, 
+			# 									world.dim_p)
+			random_pos = np.array([0.0, 0.0])
+			line_pos = random_pos
 
 
 			goal_size = world.landmarks[num_goals_added].size
-			obs_collision = self.is_obstacle_collision(random_pos, goal_size, world)
-			landmark_collision = self.is_landmark_collision(random_pos, 
+			obs_collision = self.is_obstacle_collision(line_pos, goal_size, world)
+			landmark_collision = self.is_landmark_collision(line_pos, 
 												goal_size, 
 												world.landmarks[:num_goals_added])
 			if not landmark_collision and not obs_collision:
 			# if not landmark_collision:
-				world.landmarks[num_goals_added].state.p_pos = random_pos
-				world.landmarks[num_goals_added].state.reset_velocity()
+				world.landmarks[num_goals_added].state.p_pos = line_pos
+				world.landmarks[num_goals_added].state.p_vel = np.zeros(world.dim_p)
 				num_goals_added += 1
+		goal_pos = [goal.state.p_pos for goal in world.landmarks]
 
-		self.landmark_poses = np.array([landmark.state.p_pos for landmark in world.landmarks])
-		self.landmark_poses_occupied = np.zeros(self.num_agents)
-		self.landmark_poses_updated = np.array([landmark.state.p_pos for landmark in world.landmarks])
-		self.agent_id_updated = np.arange(self.num_agents)
+		# set wall at end of world positions 
+		# and also check collisions with already placed goals
+		# num_goals_added = 0
+		# goals_added = []
 		#####################################################
 
+
+		############ update the cached distances ############
+		world.calculate_distances()
+		self.update_graph(world)
+		####################################################
+
+		#################### set first expected positions ####################
+		# Define the tip of the arrow as the landmark's position
+		arrow_tip = world.landmarks[0].state.p_pos
+		# print("arrow_tip",arrow_tip)
+		# Define the angle of the arrow's wings
+		# self.arrow_angle = np.random.uniform(0, np.pi/2)  # Adjust the range as needed
+		# print("arrow_angle",self.arrow_angle)
+		self.arrow_angle = np.pi/4
+		# Initialize the expected positions array
+		self.expected_poses = np.zeros((self.num_agents, world.dim_p))
+
+		# Distribute the agents evenly on both sides of the arrow
+		for i in range(self.num_agents):
+			# Calculate the distance from the tip of the arrow
+			distance_from_tip = self.target_radius * (i + 1)
+			# print("distance_from_tip",distance_from_tip)
+			# Determine the side of the arrow (left or right)
+			if i % 2 == 0:
+				# Left side of the arrow
+				angle = self.arrow_angle
+			else:
+				# Right side of the arrow
+				angle = -self.arrow_angle
+
+			# Calculate the expected position
+			self.expected_poses[i] = arrow_tip + distance_from_tip * np.array([np.sin(angle), -np.cos(angle)])
+			# print("expected_poses",self.expected_poses)
+		### set a flag for expected Postions to indicate if an agent is currently occupying that position
+		self.expected_poses_occupied = np.zeros(self.num_agents)
+		# print("expected_poses",self.expected_poses)
 		############ find minimum times to goals ############
 		if self.max_speed is not None:
 			for agent in world.agents:
 				self.min_time(agent, world)
-		#####################################################
-		# ############ update the cached distances ############
-		# world.calculate_distances()
-		# self.update_graph(world)
-		# ####################################################
-		
-		########### set fair goals for each agent ###########
-		costs = dist.cdist(agent_pos, self.landmark_poses)
-		# print("costs",costs)
-		x, objs = solve_fair_assignment(costs)
-		# print('x',x,"objs", objs)
-		self.goal_match_index = np.where(x==1)[1]
-		if self.goal_match_index.size == 0 or self.goal_match_index.shape != (self.num_agents,):
-			self.goal_match_index = np.arange(self.num_agents)
+		#####################################################		
+		# ########### set fair goals for each agent ###########
+		# costs = dist.cdist(agent_pos, goal_pos)
+		# x, objs = solve_fair_assignment(costs)
+		# # print('x',x, objs)
+		# self.goal_match_index = np.where(x==1)[1]
+		# if self.goal_match_index.size == 0 or self.goal_match_index.shape != (self.num_agents,):
+		# 	self.goal_match_index = np.arange(self.num_agents)
+		# # print("goalmatch",self.goal_match_index,agent.id)
+		# color_list= [np.array([0.35, 0.35, 0.85]),np.array([0.85, 0.35, 0.35]),np.array([0.35, 0.85, 0.35])]
+		# for i, agent in enumerate(world.agents):
+		# 	# landmark.color = np.array([0.15, 0.85, 0.15])
+		# 	agent.color = color_list[self.goal_match_index[i]%3]
+		# 		# landmark.color = np.array([0.15, 0.85, 0.15])
 
 		#####################################################
-
-		############ check fairness metric match ###########
-
-	def initialize_min_time_distance_graph(self, world):
-		for agent in world.agents:
-			self.min_time(agent, world)
-		world.calculate_distances()
-		self.update_graph(world)
+		# reset  
 
 	def info_callback(self, agent:Agent, world:World) -> Tuple:
 		# TODO modify this 
-
-		world.dists = np.array([np.linalg.norm(agent.state.p_pos - l.state.p_pos) for l in world.landmarks])
+		# rew = 0
+		# collisions = 0
+		# occupied_landmarks = 0
+		# goal = world.get_entity('landmark',self.expected_poses[agent.id])
+		dist = np.sqrt(np.sum(np.square(agent.state.p_pos - 
+										self.expected_poses[agent.id])))
+		world.dist_left_to_goal[agent.id] = dist
 		
-		nearest_landmark = np.argmin(world.dists)
-		dist_to_goal = world.dists[nearest_landmark]
-		if dist_to_goal < self.min_dist_thresh and (nearest_landmark != self.goal_reached[agent.id] and self.goal_reached[agent.id] != -1):
-			# print("AGENT", agent.id, "reached NEW goal",world.dist_left_to_goal[agent.id])
-			self.goal_reached[agent.id] = nearest_landmark
-			world.dist_left_to_goal[agent.id] = dist_to_goal
 		# only update times_required for the first time it reaches the goal
-		if dist_to_goal < self.min_dist_thresh and (world.times_required[agent.id] == -1):
-			# print("agent", agent.id, "reached goal",world.dist_left_to_goal[agent.id])
+		if dist < self.min_dist_thresh and (world.times_required[agent.id] == -1):
 			world.times_required[agent.id] = world.current_time_step * world.dt
 			world.dists_to_goal[agent.id] = agent.state.p_dist
-			world.dist_left_to_goal[agent.id] = dist_to_goal
-			self.goal_reached[agent.id] = nearest_landmark
-			# print("dist to goal",world.dists_to_goal[agent.id],world.dists_to_goal)
-		if world.times_required[agent.id] == -1:
-			# print("agent", agent.id, "not reached goal yet",world.dist_left_to_goal[agent.id])
-			world.dists_to_goal[agent.id] = agent.state.p_dist
-			world.dist_left_to_goal[agent.id] = dist_to_goal
-		if dist_to_goal > self.min_dist_thresh and world.times_required[agent.id] != -1:
-			# print("AGENT", agent.id, "left goal",dist_to_goal,world.dist_left_to_goal[agent.id])
-			world.dists_to_goal[agent.id] = agent.state.p_dist
-			world.times_required[agent.id] = world.current_time_step * world.dt
-			world.dist_left_to_goal[agent.id] = dist_to_goal
-		if dist_to_goal < self.min_dist_thresh and (nearest_landmark == self.goal_reached[agent.id]):
-			# print("AGENT", agent.id, "on SAME goal",world.dist_left_to_goal[agent.id])
-			## TODO: How to update time as well?
-			world.dist_left_to_goal[agent.id] = dist_to_goal
-			self.goal_reached[agent.id] = nearest_landmark
 
-			# print("dist is",world.dists_to_goal[agent.id])
+		agent_position = agent.state.p_pos
+		arrow_tip = world.landmarks[0].state.p_pos
+		# Define the vectors for the two lines
+		arrow_wing_vector_1 = self.expected_poses[self.num_agents-1] - arrow_tip
+		arrow_wing_vector_2 = self.expected_poses[self.num_agents-2] - arrow_tip
+
+		# Vector from arrow_tip to agent
+		vector_to_agent = agent_position - arrow_tip
+
+		# Calculate the perpendicular distances
+		perpendicular_distance_1 = np.linalg.norm(np.cross(vector_to_agent, arrow_wing_vector_1)) / np.linalg.norm(arrow_wing_vector_1)
+		perpendicular_distance_2 = np.linalg.norm(np.cross(vector_to_agent, arrow_wing_vector_2)) / np.linalg.norm(arrow_wing_vector_2)
+		# Define a threshold for the maximum allowed perpendicular distance
+		threshold = 0.1
+		# Check if the agent is within any arrow wing
+		if perpendicular_distance_1 <= threshold or perpendicular_distance_2 <= threshold:
+			world.formation_complete[agent.id] = 1
+			# only update times_required for the first time it reaches the goal
+			if (world.times_required[agent.id] == -1):
+				world.times_required[agent.id] = world.current_time_step * world.dt
+				world.dists_to_goal[agent.id] = agent.state.p_dist
+
+
+
+
+		# # Calculate the vector between the agent and the arrow tip
+		# agent_vector = agent.state.p_pos - world.landmarks[0].state.p_pos
+		# # Calculate the angle of the agent relative to the arrow tip
+		# agent_angle = np.arctan2(agent_vector[1], agent_vector[0])
+		# # print("prev agent_angle",agent_angle,"arrow_angle",self.arrow_angle)
+		# if agent_angle < -np.pi/2:
+		# 	agent_angle += np.pi
+		# # Define a threshold for the maximum allowed angular deviation
+		# angle_threshold = 0.3  # Adjust as needed
+		# arrow_angle_shift = np.pi/2 - self.arrow_angle
+		# # print("agent_angle",agent_angle,"arrow_angle",arrow_angle_shift)
+		# # Check if the agent's angular position is within the arrow's wings
+		# if np.abs(agent_angle - arrow_angle_shift) <= angle_threshold or np.abs(agent_angle + arrow_angle_shift) <= angle_threshold:
+		# 	world.formation_complete[agent.id] = 1
+
+
+
+		if world.times_required[agent.id] == -1:
+			world.dists_to_goal[agent.id] = agent.state.p_dist
 
 		if agent.collide:
 			if self.is_obstacle_collision(agent.state.p_pos, agent.size, world):
@@ -489,7 +539,8 @@ class Scenario(BaseScenario):
 		# create the mean and stddev for time taken
 		world.time_taken_mean = np.mean(world.times_required)
 		world.time_taken_stddev = np.std(world.times_required)
-
+		# print("Hi agent", agent.id, self.agent_dist_traveled[agent.id],world.dists_to_goal[agent.id],"mean",world.dist_traveled_mean,"stddev", world.dist_traveled_stddev)
+		# print("fair", world.dist_traveled_mean/(world.dist_traveled_stddev+0.0001))
 		agent_info = {
 			'Dist_to_goal': world.dist_left_to_goal[agent.id],
 			'Time_req_to_goal': world.times_required[agent.id],
@@ -501,15 +552,19 @@ class Scenario(BaseScenario):
 			'Mean_by_variance': world.dist_traveled_mean/(world.dist_traveled_stddev+0.0001),
 			'Dists_traveled': world.dists_to_goal[agent.id],
 			'Time_taken': world.times_required[agent.id],
+			'Formation_dist': world.formation_complete[agent.id],
 			# Time mean and stddev
 			'Time_mean': world.time_taken_mean,
 			'Time_stddev': world.time_taken_stddev,
 			'Time_mean_by_stddev': world.time_taken_mean/(world.time_taken_stddev+0.0001),
 
+			# add goal reached params
+			# 'Goal_reached':
+			# 'Goal_matched':
 
 		}
 		if self.max_speed is not None:
-			agent_info['Min_time_to_goal'] = agent.goal_min_time
+			agent_info['Min_time_to_goal'] =  agent.goal_min_time ## agent.goal_min_time
 		return agent_info
 
 	# check collision of entity with obstacles and walls
@@ -520,6 +575,7 @@ class Scenario(BaseScenario):
 			delta_pos = obstacle.state.p_pos - pos
 			dist = np.linalg.norm(delta_pos)
 			dist_min = 2.0*(obstacle.size + entity_size)
+			# print("1Dist", dist,"dist_min",dist_min, collision)
 
 			if dist < dist_min:
 				collision = True
@@ -529,12 +585,16 @@ class Scenario(BaseScenario):
 		for wall in world.walls:
 			if wall.orient == 'H':
 				# Horizontal wall, check for collision along the y-axis
+				# print("wall.axis_pos",(wall.axis_pos - 1.2*entity_size ), "other axis_pos", (wall.axis_pos + 1.2*entity_size ))
+				# print("wall.endpoints",(wall.endpoints[0] - entity_size / 2), (wall.endpoints[1] + 1.5*entity_size ))
+				# print("pos",pos)
 				if (wall.axis_pos - 1.5*entity_size ) <= pos[1] <= (wall.axis_pos + 1.5*entity_size ):
 					if (wall.endpoints[0] - 1.5*entity_size ) <= pos[0] <= (wall.endpoints[1] + 1.5*entity_size ):
 						collision = True
 						break
 			elif wall.orient == 'V':
 				# Vertical wall, check for collision along the x-axis
+
 				if (wall.axis_pos - 1.5*entity_size ) <= pos[0] <= (wall.axis_pos + 1.5*entity_size ):
 					if (wall.endpoints[0] - 1.5*entity_size ) <= pos[1] <= (wall.endpoints[1] + 1.5*entity_size ):
 						collision = True
@@ -575,38 +635,52 @@ class Scenario(BaseScenario):
 
 	# get min time required to reach to goal without obstacles
 	def min_time(self, agent:Agent, world:World) -> float:
-		assert agent.max_speed is not None, "Agent needs to have a max_speed."
-		assert agent.max_speed > 0, "Agent max_speed should be positive."
-		agent_id = agent.id
+		assert agent.max_speed is not None, "Agent needs to have a max_speed"
+		# agent_id = agent.id
 		# get the goal associated to this agent
-		landmark = world.get_entity(entity_type='landmark', id=self.goal_match_index[agent.id])
+		# landmark = world.get_entity(entity_type='landmark', id=self.expected_poses[agent.id])
 		dist = np.sqrt(np.sum(np.square(agent.state.p_pos - 
-										landmark.state.p_pos)))
+										self.expected_poses[agent.id])))
 		min_time = dist / agent.max_speed
 		agent.goal_min_time = min_time
 		return min_time
 
-	# done condition for each agent
-	def done(self, agent:Agent, world:World) -> bool:
-		# if we are using dones then return appropriate done
+
+	def done(self, agent, world):
 		if self.use_dones:
-			if world.current_time_step >= world.world_length:
-				return True
-			else:
-				landmark = world.get_entity('landmark',self.goal_match_index[agent.id])
-				dist = np.sqrt(np.sum(np.square(agent.state.p_pos - 
-												landmark.state.p_pos)))
-				if dist < self.min_dist_thresh:
-					return True
-				else:
-					return False
-		# it not using dones then return done 
-		# only when episode_length is reached
+			condition1 = world.current_time_step >= world.world_length
+			self.is_success = np.all(self.delta_dists < self.min_dist_thresh)
+			return condition1 or self.is_success
 		else:
+			# print("not using done")
 			if world.current_time_step >= world.world_length:
 				return True
 			else:
 				return False
+
+
+	# # done condition for each agent
+	# def done(self, agent:Agent, world:World) -> bool:
+	# 	# if we are using dones then return appropriate done
+	# 	if self.use_dones:
+	# 		if world.current_time_step >= world.world_length:
+	# 			return True
+	# 		else:
+	# 			# landmark = world.get_entity('landmark',self.goal_match_index[agent.id])
+	# 			dist = np.sqrt(np.sum(np.square(agent.state.p_pos - 
+	# 											self.expected_poses[agent.id])))
+	# 			if dist < self.min_dist_thresh:
+	# 				return True
+	# 			else:
+	# 				return False
+	# 	# it not using dones then return done 
+	# 	# only when episode_length is reached
+	# 	else:
+	# 		# print("not using done")
+	# 		if world.current_time_step >= world.world_length:
+	# 			return True
+	# 		else:
+	# 			return False
 
 
 	def _bipartite_min_dists(self, dists):
@@ -614,169 +688,218 @@ class Scenario(BaseScenario):
 		min_dists = dists[ri, ci]
 		return min_dists
 
-	def reward(self, agent:Agent, world:World) -> float:
-		# np.set_printoptions(formatter={'float': '{:0.3f}'.format})
 
+
+	def reward(self, agent, world):
 		rew = 0
-		if world.dists_to_goal[agent.id] == -1:
-			mean_dist,  std_dev_dist, _ = self.collect_dist(world)
-			fairness_param = mean_dist/(std_dev_dist+0.0001)
-		else:
-			fairness_param = world.dist_traveled_mean/(world.dist_traveled_stddev+0.0001)
 
 		if agent.id == 0:
+			# landmark_pose = world.landmarks[0].state.p_pos
+			# relative_poses = [
+			# 	agent.state.p_pos - landmark_pose for agent in world.agents
+			# ]
+			# thetas = get_thetas(relative_poses)
+			# # anchor at the agent with min theta (closest to the horizontal line)
+			# theta_min = min(thetas)
+			# # print("rew theta_min",theta_min,"thetas",thetas)
+			# self.expected_poses = np.array([
+			# 	landmark_pose
+			# 	+ self.target_radius
+			# 	* np.array(
+			# 		[
+			# 			np.cos(theta_min + i * self.ideal_theta_separation),
+			# 			np.sin(theta_min + i * self.ideal_theta_separation),
+			# 		]
+			# 	)
+			# 	for i in range(self.num_agents)
+			# ])
+			# print("reward expected_poses",self.expected_poses)
+			self.dists = np.array(
+				[
+					[np.linalg.norm(a.state.p_pos - pos) for pos in self.expected_poses]
+					for a in world.agents
+				]
+			)
+			# print("agent_pos",np.array([a.state.p_pos for a in world.agents]))
+			# print("dists",self.dists)
 
-			##### fair assignment to check if it makes it more fair
-			agent_pos = [agent.state.p_pos for agent in world.agents]
-			costs = dist.cdist(agent_pos, self.landmark_poses)
+			## for every column in dists if the value is below min_dist_thresh then set self.expected_poses_occupied to 1 for that index
+			# mask = self.dists < self.min_dist_thresh
+			# self.expected_poses_occupied = np.any(mask, axis=0).astype(int)
+			# print("expected_poses_occupied",self.expected_poses_occupied)
 
+			# optimal 1:1 agent-landmark pairing (bipartite matching algorithm)
+			self.delta_dists = self._bipartite_min_dists(self.dists)
+			# print("delta_dists",self.delta_dists)
+			world.dists = self.delta_dists
 
-			x, objs = solve_fair_assignment(costs)
-			self.goal_match_index = np.where(x==1)[1]
-			if self.goal_match_index.size == 0 or self.goal_match_index.shape != (self.num_agents,):
-				self.goal_match_index = np.arange(self.num_agents)
-
-		dist_to_fair_goal = np.linalg.norm(agent.state.p_pos - self.landmark_poses[self.goal_match_index[agent.id]])
-
-		if dist_to_fair_goal < self.min_dist_thresh:
+		# print("self.goal_rew",self.goal_rew,"self.delta_dists",self.delta_dists[agent.id])
+		## non shared rewards
+		if self.delta_dists[agent.id] < self.min_dist_thresh:
+			# print("goal_rew",self.goal_rew)
 			if agent.status ==False:
 				agent.status = True
-				agent.state.reset_velocity()
+				agent.state.p_vel[0]=0.0
+				agent.state.p_vel[1]=0.0
 				rew += self.goal_rew
-
 		else:
-				rew -= dist_to_fair_goal
-
+			rew -= self.delta_dists[agent.id]
 		if agent.collide:
 			for a in world.agents:
 				# do not consider collision with itself
 				if a.id == agent.id:
 					continue
 				if self.is_collision(a, agent):
+					# print("self.collision_rew",self.collision_rew)
 					rew -= self.collision_rew
-			# check collision with obstacles
 			if self.is_obstacle_collision(pos=agent.state.p_pos,
 										entity_size=agent.size, world=world):
+				# print("obstacle collision",self.collision_rew)
 				rew -= self.collision_rew
+			# total_penalty = np.mean(np.clip(self.delta_dists, 0.0, 2))
+			# self.joint_reward = -total_penalty
+			# # print("joint_reward",self.joint_reward)
+		# print("rew",rew)
+		rew = np.clip(rew, -2*self.collision_rew, self.goal_rew)
+		return rew
+		# return np.clip(rew, -2*self.collision_rew, self.goal_rew)
 
-		scaled_input = fairness_param
-		tanh_output = np.tanh(scaled_input-self.zeroshift)
-		fair_rew = self.fair_rew * tanh_output
-		# reduce the negative reward if the fairness is not met
-		if fair_rew < -self.fair_rew:
-			fair_rew = -self.fair_rew
-			
-		rew += fair_rew 
-		return np.clip(rew, -2*self.collision_rew, self.goal_rew+self.fair_rew)
 
 	def observation(self, agent:Agent, world:World) -> arr:
 		"""
 			Return:
 				[agent_vel, agent_pos, goal_pos, goal_occupied]
 		"""
-		# np.set_printoptions(formatter={'float': '{:0.3f}'.format})
-
-		world.dists = np.array([np.linalg.norm(agent.state.p_pos - l) for l in self.landmark_poses])
+		# print("AGENT", agent.id)
+		# get positions of all entities in this agent's reference frame
+		# # bipartite matching
+		######## TO EDIT ########
+		# world.dists = np.array([np.linalg.norm(agent.state.p_pos - l) for l in self.expected_poses])
+		# goal_pos = []
+		# agents_goal =  self.expected_poses[np.argmin(world.dists)]
+		# goal_pos.append(agents_goal - agent.state.p_pos)
+		# return np.concatenate([agent.state.p_vel, agent.state.p_pos] + goal_pos)
+		world.dists = np.array([np.linalg.norm(agent.state.p_pos - l) for l in self.expected_poses])
 		min_dist = np.min(world.dists)
 		sorted_indices = np.argsort(world.dists)  # Get indices that would sort the distances
+		# print("Agent! sorted indices", sorted_indices)
 		top_two_indices = sorted_indices[:2]  # Get indices of top two closest distances
-		second_closest_goal = self.landmark_poses[top_two_indices[1]]
+		second_closest_goal = self.expected_poses[top_two_indices[1]]
 		# get goal occupied flag for that goal
-		second_closest_goal_occupied = np.array([self.landmark_poses_occupied[top_two_indices[1]]])
+		second_closest_goal_occupied = np.array([self.expected_poses_occupied[top_two_indices[1]]])
 		if min_dist < self.min_obs_dist:
 			# If the minimum distance is already less than self.min_dist_thresh, use the previous goal.
 			# If the minimum distance is already less than self.min_obs_dist, use the previous goal.
 			chosen_goal = np.argmin(world.dists)
-			agents_goal = self.landmark_poses[chosen_goal]
-
-
+			agents_goal = self.expected_poses[chosen_goal]
 			## check if any agent have left goals to go to other goals
 			# check which agents among the world.dists are less than self.min_obs_dist
 			# find which goals are within self.min_obs_dist and unoccupied
 			nearby_goals = np.where(world.dists < self.min_obs_dist)[0]
+			# print("nearby_goals",nearby_goals)
 			# check if any of those have bee occupied and verify if true
 			for goal in nearby_goals:
-				# print("Agent",agent.id,"Nearby goal",goal,self.landmark_poses_occupied[goal])
-				if self.landmark_poses_occupied[goal] == 1.0:
+				# print("Agent",agent.id,"Nearby goal",goal,self.expected_poses_occupied[goal])
+				if self.expected_poses_occupied[goal] == 1.0:
 					# print("Agent",agent.id,"Nearby goal",goal, "is occupied")
-					goal_proximity = np.array([np.linalg.norm(self.landmark_poses[goal] - agent.state.p_pos)  for agent in world.agents])
+					goal_proximity = np.array([np.linalg.norm(self.expected_poses[goal] - agent.state.p_pos)  for agent in world.agents])
 					if np.any(goal_proximity < self.min_dist_thresh):
 						# print("Agent",agent.id,"Nearby goal",goal, "is occupied and another agent is at goal")
 						continue
 					else:
 						# print("Agent",agent.id,"Nearby goal",goal, "is shown occupied but no agent is at goal")
-						self.landmark_poses_occupied[goal] = np.min(goal_proximity)
+						self.expected_poses_occupied[goal] = np.min(goal_proximity)
 
 			if min_dist < self.min_dist_thresh:
-				self.landmark_poses_occupied[chosen_goal] = 1.0
+				self.expected_poses_occupied[chosen_goal] = 1.0
 				self.goal_history[chosen_goal] = agent.id
-				# print("Ag",agent.id," AT GOAL",np.min(world.dists), "goal_occupied",self.landmark_poses_occupied[chosen_goal])
+				# print("ag! ",agent.id,"AT GOAL",chosen_goal, "dist",min_dist, "goal_occupied",self.expected_poses_occupied[chosen_goal],"occupied flags",self.expected_poses_occupied,"history",self.goal_history)
+
 
 			else:
-				# goal_proximity is finding how many agents are nearthi chosen goal
+				# goal_proximity is finding how many agents are near the chosen goal
 				goal_proximity = np.array([np.linalg.norm(agents_goal - agent.state.p_pos)  for agent in world.agents])
-				# print("Agent",agent.id,"chosen_goal", chosen_goal, "goal_proximity",goal_proximity, "flags",self.landmark_poses_occupied, "history",self.goal_history)
+				# print("Agent",agent.id,"chosen_goal", chosen_goal, "goal_proximity",goal_proximity, "flags",self.expected_poses_occupied, "history",self.goal_history)
 				closest_dist_to_goal = np.min(goal_proximity)
-
-
 				# agent veered off the goal
-				if self.landmark_poses_occupied[chosen_goal] == 1.0:
+				if self.expected_poses_occupied[chosen_goal] == 1.0:
 
 					# if there are no agents on the goal, then the agent can take the goal and change the occupancy value
 					if np.any(goal_proximity < self.min_dist_thresh):
-						# print("Agent!", "{:.0f}".format(self.goal_history[chosen_goal]), " is already at goal", "{:.0f}".format(chosen_goal), "min_dist", "{:.3f}".format(min_dist), "occupied flags",  self.landmark_poses_occupied, "history", self.goal_history)
-
+						# print("Agent!", "{:.0f}".format(self.goal_history[chosen_goal]), " is already at goal", "{:.0f}".format(chosen_goal), "min_dist", "{:.3f}".format(min_dist), "occupied flags",  self.expected_poses_occupied, "history", self.goal_history)
 						######
 						## Add case when all nearby observed goals are occupied
-						unoccupied_goals = self.landmark_poses[self.landmark_poses_occupied!= 1]
-						unoccupied_goals_indices = np.where(self.landmark_poses_occupied != 1)[0]
+						unoccupied_goals = self.expected_poses[self.expected_poses_occupied!= 1]
+						# print(agent.id,"Unoccupied",unoccupied_goals)
+						unoccupied_goals_indices = np.where(self.expected_poses_occupied != 1)[0]
 						chosen_goal = np.argmin(np.linalg.norm(agent.state.p_pos - unoccupied_goals, axis=1))
+						# print("min_dist_goal",min_dist_goal,unoccupied_goals_indices[min_dist_goal])
 						agents_goal = unoccupied_goals[chosen_goal]
-
+						# second_index = np.where((self.expected_poses == second_closest_goal).all(axis=1))[0]
+						# if top_two_indices[1] == chosen_goal:
+						# 	print("FIRST and SECOND is same")
+						# ## check if the goal is occupied
+						# goal_occupied = np.array([self.expected_poses_occupied[unoccupied_goals_indices[min_dist_goal]]])
+						# goal_history = self.goal_history[unoccupied_goals_indices[min_dist_goal]]
+						######
 					else:
-
-						self.landmark_poses_occupied[chosen_goal] = 1.0-closest_dist_to_goal
+						# self.expected_poses_occupied[chosen_goal] = 1.0 - min_dist
+						# print("FLag about to update",self.expected_poses_occupied[chosen_goal])
+						self.expected_poses_occupied[chosen_goal] = 1.0-closest_dist_to_goal
+						# print("Flag updated",self.expected_poses_occupied[chosen_goal])
+						# print("Agent!", "{:.0f}".format(self.goal_history[chosen_goal]), " veered off the goal", "{:.0f}".format(chosen_goal), "min_dist", "{:.3f}".format(min_dist), "occupied flags",  self.expected_poses_occupied, "history", self.goal_history)
 
 				# another agent already at goal, can't overwrite the flag
-				elif self.landmark_poses_occupied[chosen_goal] != 1.0:
-					self.landmark_poses_occupied[chosen_goal] = 1.0-closest_dist_to_goal
-
-			goal_occupied = np.array([self.landmark_poses_occupied[chosen_goal]])
+				elif self.expected_poses_occupied[chosen_goal] != 1.0:
+					# self.expected_poses_occupied[chosen_goal] = 1.0 - min_dist
+					# print("ag! ", agent.id, "NEAR GOAL", chosen_goal, "dist", "{:.3f}".format(min_dist), "goal_occupied_flag", "{:.3f}".format(self.expected_poses_occupied[chosen_goal]), "occupied flags", self.expected_poses_occupied, "history", self.goal_history)
+					# print("FLag about to update",self.expected_poses_occupied[chosen_goal])
+					self.expected_poses_occupied[chosen_goal] =  1.0-closest_dist_to_goal
+					# print("Flag updated",self.expected_poses_occupied[chosen_goal])
+			# self.expected_poses_occupied[chosen_goal] = 1
+			goal_occupied = np.array([self.expected_poses_occupied[chosen_goal]])
 			goal_history = self.goal_history[chosen_goal]
-
 		else:
-			# create another variable to store which goals are uncoccupied using an index of 0, 1 or 2 based on self.landmark_poses
-			unoccupied_goals = self.landmark_poses[self.landmark_poses_occupied!= 1]
+			unoccupied_goals = self.expected_poses[self.expected_poses_occupied!= 1.0]
+			unoccupied_goals_indices = np.where(self.expected_poses_occupied != 1.0)[0]
 
-			unoccupied_goals_indices = np.where(self.landmark_poses_occupied != 1)[0]
 			if len(unoccupied_goals) > 0:
+				# # if goals are unoccupied, match based on bipartite matching
+				# self.dists = np.array(
+				# [
+				# 	[np.linalg.norm(a.state.p_pos - pos) for pos in self.expected_poses]
+				# 	for a in world.agents
+				# ]
+				# )
+				# # self.delta_dists = self._bipartite_min_dists(self.dists)
+				# # print("delta_dists",self.delta_dists)
+				# _, goals = linear_sum_assignment(self.dists)
+				# # print("ri",agents,"ci",goals)
+				# agents_goal = self.expected_poses[goals[agent.id]]
+				# goal_occupied = np.array([self.expected_poses_occupied[goals[agent.id]]])
 
-				## determine which goal from self.landmark_poses is this chosen unocccupied goal
-				## use the index of the unoccupied goal to get the goal from self.landmark_poses
 				min_dist_goal = np.argmin(np.linalg.norm(agent.state.p_pos - unoccupied_goals, axis=1))
+				# print("min_dist_goal",min_dist_goal,unoccupied_goals_indices[min_dist_goal])
 				agents_goal = unoccupied_goals[min_dist_goal]
-
 				## check if the goal is occupied
-				goal_occupied = np.array([self.landmark_poses_occupied[unoccupied_goals_indices[min_dist_goal]]])
+				goal_occupied = np.array([self.expected_poses_occupied[unoccupied_goals_indices[min_dist_goal]]])
 				goal_history = self.goal_history[unoccupied_goals_indices[min_dist_goal]]
-
-				## the second_closest_goal  needs to be from the unoccupied goals  or if there aren't any more unoccupied goals, it should be the closest from the occupied goals
-
-
-
+				## check if the goal is occupied
 			else:
 				# Handle the case when all goals are occupied.
+				# You can choose a default action here or raise an exception.
 				agents_goal = agent.state.p_pos
-				self.landmark_poses_occupied = np.zeros(self.num_agents)
+				self.expected_poses_occupied = np.zeros(self.num_agents)
 				goal_history = self.goal_history[agent.id]
-				goal_occupied = np.array([self.landmark_poses_occupied[agent.id]])
+				goal_occupied = np.array([self.expected_poses_occupied[agent.id]])
 		
 		goal_pos = agents_goal - agent.state.p_pos
 		rel_second_closest_goal = second_closest_goal - agent.state.p_pos
 
 		goal_history = np.array([goal_history])
-
-		return np.concatenate((agent.state.p_vel, agent.state.p_pos, goal_pos,goal_occupied,goal_history, rel_second_closest_goal,second_closest_goal_occupied))
+		# print("goal_pos",goal_pos)
+		# print(np.concatenate((agent.state.p_vel, agent.state.p_pos ,goal_pos,goal_occupied,goal_history, rel_second_closest_goal,second_closest_goal_occupied)))
+		return np.concatenate((agent.state.p_vel, agent.state.p_pos ,goal_pos,goal_occupied,goal_history, rel_second_closest_goal,second_closest_goal_occupied))
 
 
 	def get_id(self, agent:Agent) -> arr:
@@ -792,11 +915,22 @@ class Scenario(BaseScenario):
 		agent_rewards = np.zeros(self.num_agents)
 		count = 0
 		for agent in world.agents:
+			# print(agent.name)
 			agent_names.append(agent.name)
 			agent_rewards[count] = self.reward(agent, world)
+			# print("Rew", agent_rewards[count])
 			count +=1
+
 		return agent_names, agent_rewards
 
+	# def modify_reward(self,reward):
+	# 	"""
+	# 	input: reward of one agent
+	# 	output: modified verison of that reward
+	# 	"""
+	# 	factor = 0.0
+	# 	update_reward = reward*factor
+	# 	return update_reward
 	
 	def collect_dist(self, world):
 		"""
@@ -819,6 +953,7 @@ class Scenario(BaseScenario):
 		goal_pos =  np.zeros((self.num_agents, 2)) # create a zero vector with the size of the number of goal and positions of dim 2
 		count = 0
 		for goal in world.landmarks:
+			# print("goal" , goal.name, "at", goal.state.p_pos)
 			goal_pos[count]= goal.state.p_pos
 			count +=1
 		return goal_pos
@@ -846,26 +981,23 @@ class Scenario(BaseScenario):
 					• Only entities close to the ego-agent are connected
 			
 		"""
-
+		# num_entities = len(world.entities)
 		# node observations
 		node_obs = []
-		fairness_param = 0.0
-
 		if world.graph_feat_type == 'global':
 			for i, entity in enumerate(world.entities):
-
 				node_obs_i = self._get_entity_feat_global(entity, world)
 				node_obs.append(node_obs_i)
-
 		elif world.graph_feat_type == 'relative':
 			for i, entity in enumerate(world.entities):
+				# print("agent", agent.id, "entity", entity.name)
+				node_obs_i = self._get_entity_feat_relative(agent, entity, world)
 
-				node_obs_i = self._get_entity_feat_relative(agent, entity, world, fairness_param)
 				node_obs.append(node_obs_i)
 
 		node_obs = np.array(node_obs)
 		adj = world.cached_dist_mag
-
+		# print("adj",adj.shape, "node_obs",node_obs.shape)
 		return node_obs, adj
 
 	def update_graph(self, world:World):
@@ -897,7 +1029,9 @@ class Scenario(BaseScenario):
 		pos = entity.state.p_pos
 		vel = entity.state.p_vel
 		if 'agent' in entity.name:
-			goal_pos = world.get_entity('landmark', self.goal_match_index[entity.id]).state.p_pos
+			# goal_pos = world.get_entity('landmark', self.goal_match_index[entity.id]).state.p_pos
+			goal_pos = self.expected_poses[entity.id]
+			# print("goal_pos",goal_pos)
 			entity_type = entity_mapping['agent']
 		elif 'landmark' in entity.name:
 			goal_pos = pos
@@ -910,7 +1044,7 @@ class Scenario(BaseScenario):
 
 		return np.hstack([vel, pos, goal_pos, entity_type])
 
-	def _get_entity_feat_relative(self, agent:Agent, entity:Entity, world:World, fairness_param: np.ndarray) -> arr:
+	def _get_entity_feat_relative(self, agent:Agent, entity:Entity, world:World) -> arr:
 		"""
 			Returns: ([velocity, position, goal_pos, entity_type])
 			in coords relative to the `agent` for the given entity
@@ -921,68 +1055,97 @@ class Scenario(BaseScenario):
 		entity_vel = entity.state.p_vel
 		rel_pos = entity_pos - agent_pos
 		rel_vel = entity_vel - agent_vel
+		# print("entity", entity.name, "rel_vel", rel_vel, entity_vel,agent_vel)
 		if 'agent' in entity.name:
-			world.dists = np.array([np.linalg.norm(entity.state.p_pos - l) for l in self.landmark_poses])
+			# goal_pos = world.get_entity('landmark',  0).state.p_pos
+			# goal_pos = self.expected_poses[entity.id]
+			# print("RELgoal_pos",goal_pos)
+
+			### inefficient loops
+			# print("graph obs expected_poses",self.expected_poses)
+			world.dists = np.array([np.linalg.norm(entity.state.p_pos - l) for l in self.expected_poses])
 			min_dist = np.min(world.dists)
 			if min_dist < self.min_obs_dist:
 				# If the minimum distance is already less than self.min_dist_thresh, use the previous goal.
 				chosen_goal = np.argmin(world.dists)
-				goal_pos = self.landmark_poses[chosen_goal]
+				goal_pos = self.expected_poses[chosen_goal]
 				goal_history = self.goal_history[chosen_goal]
-				goal_occupied = np.array([self.landmark_poses_occupied[chosen_goal]])
 
+				goal_occupied = np.array([self.expected_poses_occupied[chosen_goal]])
+
+				# self.expected_poses_occupied[np.argmin(world.dists)] = 1
+
+				# goal_pos = self.expected_poses[np.argmin(world.dists)]
+				# goal_occupied = np.array([self.expected_poses_occupied[np.argmin(world.dists)]])
 			else:
-				unoccupied_goals = self.landmark_poses[self.landmark_poses_occupied!= 1]
-				unoccupied_goals_indices = np.where(self.landmark_poses_occupied != 1)[0]
+				unoccupied_goals = self.expected_poses[self.expected_poses_occupied!= 1.0]
+				unoccupied_goals_indices = np.where(self.expected_poses_occupied != 1.0)[0]
 				if len(unoccupied_goals) > 0:
-
-					## use closest goal
-
-					## determine which goal from self.landmark_poses is this chosen unocccupied goal
-					## use the index of the unoccupied goal to get the goal from self.landmark_poses
+					# # if goals are unoccupied, match based on bipartite matching
+					# self.dists = np.array(
+					# [
+					# 	[np.linalg.norm(a.state.p_pos - pos) for pos in self.expected_poses]
+					# 	for a in world.agents
+					# ]
+					# )
+					# # self.delta_dists = self._bipartite_min_dists(self.dists)
+					# # print("delta_dists",self.delta_dists)
+					# _, goals = linear_sum_assignment(self.dists)
+					# # print("ri",agents,"ci",goals)
+					# goal_pos = self.expected_poses[goals[agent.id]]
+					# goal_occupied = np.array([self.expected_poses_occupied[goals[agent.id]]])
 					min_dist_goal = np.argmin(np.linalg.norm(entity.state.p_pos - unoccupied_goals, axis=1))
 					goal_pos = unoccupied_goals[min_dist_goal]
 					## check if the goal is occupied
-					goal_occupied = np.array([self.landmark_poses_occupied[unoccupied_goals_indices[min_dist_goal]]])
+					goal_occupied = np.array([self.expected_poses_occupied[unoccupied_goals_indices[min_dist_goal]]])
 					goal_history = self.goal_history[unoccupied_goals_indices[min_dist_goal]]
 
 				else:
 					# Handle the case when all goals are occupied.
+					# You can choose a default action here or raise an exception.
 					goal_pos = entity.state.p_pos
-					self.landmark_poses_occupied = np.zeros(self.num_agents)
-					goal_occupied = np.array([self.landmark_poses_occupied[entity.id]])
+					self.expected_poses_occupied = np.zeros(self.num_agents)
+					goal_occupied = np.array([self.expected_poses_occupied[entity.id]])
 					goal_history = self.goal_history[entity.id]
 
-			goal_history = np.array([goal_history])
-
+			# print("goal_pos",goal_pos)
+			# print("REL2goal_pos",goal_pos)
 			rel_goal_pos = goal_pos - agent_pos
 			entity_type = entity_mapping['agent']
-
 		elif 'landmark' in entity.name:
+			# print("LANDMARK ####################")
 			rel_goal_pos = rel_pos
 			goal_occupied = np.array([1])
 			goal_history = entity.id if entity.id != None else 0
-			entity_type = entity_mapping['landmark']
 
+			entity_type = entity_mapping['landmark']
 		elif 'obstacle' in entity.name:
 			rel_goal_pos = rel_pos
 			goal_occupied = np.array([1])
 			goal_history = entity.id if entity.id != None else 0
-			entity_type = entity_mapping['obstacle']
 
+			entity_type = entity_mapping['obstacle']
 		elif 'wall' in entity.name:
 			rel_goal_pos = rel_pos
 			goal_occupied = np.array([1])
 			goal_history = entity.id if entity.id != None else 0
+
 			entity_type = entity_mapping['wall']
 			## get wall corner point's relative position
+			# print("wall", entity.name, entity.endpoints, entity.orient,entity.width, entity.axis_pos,entity.axis_pos+entity.width/2)
+			# print("agent", agent_pos)
 			wall_o_corner = np.array([entity.endpoints[0],entity.axis_pos+entity.width/2]) - agent_pos
 			wall_d_corner = np.array([entity.endpoints[1],entity.axis_pos-entity.width/2]) - agent_pos
-			return np.hstack([rel_vel, rel_pos, rel_goal_pos,goal_occupied,goal_history,wall_o_corner,wall_d_corner,entity_type])
+			# print("wall_o_corner",wall_o_corner, "wall_d_corner",wall_d_corner)
+			return np.hstack([rel_vel, rel_pos, rel_goal_pos,goal_occupied,goal_history,wall_o_corner,wall_d_corner, entity_type])
+			# return np.hstack([rel_vel, rel_pos, rel_goal_pos, entity_type,wall_o_corner])#,wall_d_corner])
 
 		else:
 			raise ValueError(f'{entity.name} not supported')
-		return np.hstack([rel_vel, rel_pos, rel_goal_pos,goal_occupied,goal_history,rel_pos,rel_pos,entity_type])
+		# print("rel_vel", rel_vel, "rel_pos", rel_pos, "rel_goal_pos", rel_goal_pos)
+		# print(np.hstack([rel_vel, rel_pos, rel_goal_pos,goal_occupied,goal_history,rel_pos,rel_pos, entity_type]))
+		return np.hstack([rel_vel, rel_pos, rel_goal_pos,goal_occupied,goal_history,rel_pos,rel_pos, entity_type])
+		# return np.hstack([rel_vel, rel_pos, rel_goal_pos, entity_type,rel_pos])#,rel_pos])
 
 
 
@@ -999,6 +1162,7 @@ if __name__ == "__main__":
 			self.world_size=2
 			self.num_scripted_agents=0
 			self.num_obstacles:int=3
+			self.num_landmarks:int=1
 			self.collaborative:bool=False 
 			self.max_speed:Optional[float]=2
 			self.collision_rew:float=5
@@ -1042,10 +1206,14 @@ if __name__ == "__main__":
 		for i, policy in enumerate(policies):
 			act_n.append(policy.action(obs_n[i]))
 		# step environment
-
+		# print(act_n)
 		obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n = env.step(act_n)
 		prev_rewards= reward_n
+		# print("rewards",reward_n)
+		# print("node_obs", node_obs_n[0].shape)
+		# print(obs_n[0].shape, node_obs_n[0].shape, adj_n[0].shape)
 
+		# print(obs_n[0], node_obs_n[0], adj_n[0])
 		# render all agent views
 		env.render()
 		stp+=1

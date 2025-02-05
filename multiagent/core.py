@@ -1,29 +1,220 @@
+from typing import List
+from enum import Enum
+
 import numpy as np
 import csv
+from scipy.integrate import solve_ivp
 
+from multiagent.config import DoubleIntegratorConfig, UnicycleVehicleConfig
 # function to check for team or single agent scenarios
 def is_list_of_lists(lst):
     if isinstance(lst, list) and lst:  # Check if it's a non-empty list
         return all(isinstance(item, list) for item in lst)
     return False
 
-
+class EntityDynamicsType(Enum):
+    DoubleIntegratorXY = 0
+    UnicycleVehicleXY = 1
+# Base Class for entity state.
 # physical/external base state of all entites
-class EntityState(object):
-    def __init__(self):
-        # physical position
-        self.p_pos = None
-        # physical velocity
-        self.p_vel = None
+class BaseEntityState(object):
+    def __init__(self, state_dim):
+        self.state_dim = state_dim
+        # state values
+        self.values = np.zeros(4)
+        self.max_speed = None        
+        # travel distance
         self.p_dist = 0.0
+        # travel time
         self.time = 0.0
+        # communication state (only used when entity is agent)
 
-# state of agents (including communication and internal/mental state)
-class AgentState(EntityState):
-    def __init__(self):
-        super(AgentState, self).__init__()
-        # communication utterance
         self.c = None
+
+    @property
+    def p_pos(self):
+        pass
+
+    @p_pos.setter
+    def p_pos(self, val):
+        pass
+    
+    @property
+    def p_vel(self):
+        pass
+
+    @p_vel.setter
+    def p_vel(self, val):
+        pass
+    
+    @property
+    def speed(self):
+        pass
+    
+    @staticmethod
+    def dstate(state, action):
+        pass
+    
+    def update_state(self, action, dt):
+        # state space equation shoul be specified here in child class.
+        pass
+    
+    def stop(self):
+        # stop the vehicle (set vehicle speed states to 0)
+        pass
+    
+    def reset_velocity(self, theta=None):
+        # reset vehicle velocity. the default value can be zero or random values
+        pass 
+
+
+class UnicycleVehicleXYState(BaseEntityState):
+    def __init__(self, v_min, v_max):
+        # state_dim = 4
+        # p_x, p_y, theta, v
+        super(UnicycleVehicleXYState, self).__init__(4)
+        self.min_speed = v_min
+        self.max_speed = v_max
+
+    @property
+    def p_pos(self):
+        return self.values[:2]
+
+    @p_pos.setter
+    def p_pos(self, val):
+        self.values[:2] = val
+
+    @property
+    def speed(self):
+        return self.values[3]
+    
+    @speed.setter
+    def speed(self, val):
+        self.values[3] = val
+
+    @property
+    def theta(self):
+        return self.values[2]
+
+    @theta.setter
+    def theta(self, val):
+        self.values[2] = val
+
+    @property
+    def p_vel(self):
+        return np.array([self.speed * np.cos(self.theta),
+                         self.speed * np.sin(self.theta)])
+    
+    @staticmethod
+    def dstate(state, action):
+        dp_x = state[3] * np.cos(state[2])
+        dp_y = state[3] * np.sin(state[2])
+        dtheta = action[0]
+        dv = action[1]
+        return np.array([dp_x, dp_y, dtheta, dv])
+
+    def update_state(self, action, dt):
+        def ode(t, y):
+            return self.dstate(y, action)
+        y0 = self.values
+        sol = solve_ivp(ode, [0, dt], y0, method='RK45')
+        self.values = sol.y[:, -1]
+        
+        if self.speed > self.max_speed:
+            self.speed = self.max_speed
+        if self.speed < self.min_speed:
+            self.speed = self.min_speed
+        # update traveled time and distance.
+        # TODO integration here is inaccurate. Need to fix this.
+        self.p_dist += self.speed * dt
+        self.time += dt
+    
+    def stop(self):
+        self.theta = 0
+        self.speed = 0
+    
+    def reset_velocity(self, theta=None):
+        if theta is not None:
+            self.theta = theta
+        else:
+            self.theta = np.random.uniform(0, 2 * np.pi)
+        self.speed = self.min_speed
+    
+    def __getitem__(self, idx):
+        return self.values[idx]
+    
+class DoubleIntegratorXYState(BaseEntityState):
+    def __init__(self):
+        # state_dim = 4
+        # p_x, p_y, v_x, v_y
+        super(DoubleIntegratorXYState, self).__init__(4)
+        # double integrator can stop.
+        self.min_speed = 0.0
+        self.max_speed = DoubleIntegratorConfig().VX_MAX
+        self.min_vel_x = DoubleIntegratorConfig().VX_MIN
+        self.max_vel_x = DoubleIntegratorConfig().VX_MAX
+        self.min_accel_x = DoubleIntegratorConfig.ACCELX_MIN
+        self.max_accel_x = DoubleIntegratorConfig.ACCELX_MAX
+        self.min_accel_y = DoubleIntegratorConfig.ACCELY_MIN
+        self.max_accel_y = DoubleIntegratorConfig.ACCELY_MAX
+
+    @property
+    def p_pos(self):
+        return self.values[:2]
+
+    @p_pos.setter
+    def p_pos(self, val):
+        self.values[:2] = val
+
+
+    @property
+    def speed(self):
+        return np.sqrt(self.values[2] ** 2 + self.values[3] ** 2)
+    
+
+    @property
+    def theta(self):
+        return np.arctan2(self.values[3], self.values[2])
+
+    @property
+    def p_vel(self):
+        return self.values[2:]
+
+    @p_vel.setter
+    def p_vel(self, val):
+        self.values[2:] = val
+
+    @staticmethod
+    def dstate(state, action):
+        dp_x = state[2]
+        dp_y = state[3]
+        dv_x = action[0]
+        dv_y = action[1]
+        return np.array([dp_x, dp_y, dv_x, dv_y])
+        
+    def update_state(self, action, dt): # check
+        def ode(t, y):
+            return self.dstate(y, action)
+        y0 = self.values
+        sol = solve_ivp(ode, [0, dt], y0, method='RK45')
+        self.values = sol.y[:, -1]
+        if self.speed > self.max_speed:
+            # adjust magnitude to self.max_speed
+            self.p_vel = self.max_speed * self.p_vel / self.speed
+        # update traveled time and distance.
+        self.p_dist += self.speed * dt
+        self.time += dt
+        
+    def stop(self):
+        self.p_vel = np.zeros(2)        
+
+    def reset_velocity(self, theta=None):
+        """ theta is unused but needed to match the interface of UnicycleVehicleXYState """
+        self.p_vel = np.zeros(2)        
+    
+    def __getitem__(self, idx):
+        return self.values[idx]
+
 
 # action of the agent
 class Action(object):
@@ -51,7 +242,7 @@ class Wall(object):
         self.hard = hard
         # color of wall
         self.color = np.array([0.0, 0.0, 0.0])
-        self.state = EntityState()
+        self.state = DoubleIntegratorXYState()
         # commu channel
         self.channel = None
 
@@ -80,7 +271,7 @@ class Entity(object):
         self.max_speed = None
         self.accel = None
         # state
-        self.state = EntityState()
+        self.state = DoubleIntegratorXYState()
         # mass
         self.initial_mass = 1.0
         # commu channel
@@ -97,7 +288,7 @@ class Landmark(Entity):
 
 # properties of agent entities
 class Agent(Entity):
-    def __init__(self):
+    def __init__(self, dynamics_type: EntityDynamicsType):
         super(Agent, self).__init__()
         # agent are adversary
         self.adversary = False
@@ -115,8 +306,20 @@ class Agent(Entity):
         self.c_noise = None
         # control range
         self.u_range = 1.0
-        # state
-        self.state = AgentState()
+        self.min_speed = None
+        # state & dynamics
+        self.dynamics_type = dynamics_type
+        if dynamics_type == EntityDynamicsType.DoubleIntegratorXY:
+            self.config_class = DoubleIntegratorConfig
+            self.state = DoubleIntegratorXYState()
+            self.min_speed = self.state.min_speed
+        elif dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+            self.config_class = UnicycleVehicleConfig
+            self.state = UnicycleVehicleXYState(v_min=UnicycleVehicleConfig.V_MIN, v_max=UnicycleVehicleConfig.V_MAX)
+            self.min_speed = self.state.min_speed
+        else:
+            raise NotImplementedError("Dynamics type not implemented")
+        self.max_speed = self.state.max_speed
         # action
         self.action = Action()
         # script behavior to execute
@@ -129,7 +332,10 @@ class Agent(Entity):
 
 # multi-agent world
 class World(object):
-    def __init__(self, total_actions: int = 5):
+    def __init__(self, dynamics_type: EntityDynamicsType, 
+                separation_distance=None,  total_actions: int = 5):
+        assert dynamics_type in EntityDynamicsType, "Invalid dynamics type"
+        self.dynamics_type = dynamics_type
         # if we want to construct graphs with the entities 
         self.graph_mode = False
         self.edge_list = None
@@ -149,6 +355,14 @@ class World(object):
         self.dim_p = 2
         # color dimensionality
         self.dim_color = 3
+        if dynamics_type == EntityDynamicsType.DoubleIntegratorXY:
+            self.config_class = DoubleIntegratorConfig
+        elif dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+            self.config_class = UnicycleVehicleConfig
+        else:
+            raise NotImplementedError("Dynamics type not implemented")
+        self.dt = self.config_class.DT
+        self.simulation_time = 0.0
         # simulation timestep
         self.dt = 0.1
         # physical damping
@@ -171,9 +385,13 @@ class World(object):
         # self.contact_margin = 3e-2
         # self.wall_contact_margin = 5e-2
         # cache distances between all agents (not calculated by default)
-        self.cache_dists = False
+        self.cache_dists = True
         self.cached_dist_vect = None
         self.cached_dist_mag = None
+
+        self.coordination_range = self.config_class.COMMUNICATION_RANGE
+        self.min_dist_thresh = self.config_class.DISTANCE_TO_GOAL_THRESHOLD
+
 
         #############
 		## determine the number of actions from arguments
@@ -253,30 +471,56 @@ class World(object):
 
     # update state of the world
     def step(self):
+
+        raw_action_list = self.get_action()
+        safe_action_list = raw_action_list
+
+        # integrate physical state
+        self.update_agent_state(safe_action_list)
+
         # set actions for scripted agents 
         for agent in self.scripted_agents:
             agent.t += self.dt
             agent.action = agent.action_callback(agent, self)
-        # gather forces applied to entities
-        p_force = [None] * len(self.entities)
-        # apply agent physical controls
-        p_force = self.apply_action_force(p_force)
-        # apply environment forces
-        p_force = self.apply_environment_force(p_force)
-        # integrate physical state
-        self.integrate_state(p_force)
+        # # gather forces applied to entities
+        # p_force = [None] * len(self.entities)
+        # # apply agent physical controls
+        # p_force = self.apply_action_force(p_force)
+        # # apply environment forces
+        # p_force = self.apply_environment_force(p_force)
+        # # integrate physical state
+        # self.integrate_state(p_force)
         # update agent state
         if is_list_of_lists(self.agents):
             for team in self.agents:
                 for agent in team:
                     agent.t += self.dt
-                    self.update_agent_state(agent)
+                    self.update_agent_communication_state(agent)
         else:
             for agent in self.agents:
                 agent.t += self.dt
-                self.update_agent_state(agent)
+                self.update_agent_communication_state(agent)
         if self.cache_dists:
             self.calculate_distances()
+
+        self.update_agent_min_relative_distance()
+        
+        self.simulation_time += self.dt
+
+    # gather agent action forces
+    def get_action(self):
+        # set applied forces
+        ## agent action has an linear acceleration term and an angular acceleration term
+        action_list = []
+        for i,agent in enumerate(self.agents):
+            if agent.u_noise:
+                # Jason's temporary fix
+                raise NotImplementedError
+
+            action_i = np.array([agent.action.u[0], agent.action.u[1]])
+            action_list.append(action_i)
+       
+        return action_list
 
     # gather agent action forces
     def apply_action_force(self, p_force):
@@ -340,6 +584,16 @@ class World(object):
         return p_force
 
     # integrate physical state
+
+    # integrate physical state
+    def update_agent_state(self, action_list: List):
+        # TODO: Change entities to agents
+        for i, agent in enumerate(self.agents):
+            action_i = action_list[i]
+            if not agent.movable: continue
+            if agent.status:
+                continue
+            agent.state.update_state(action_i, self.dt)
     def integrate_state(self, p_force):
         for i,entity in enumerate(self.entities):
             if not entity.movable: continue
@@ -359,8 +613,21 @@ class World(object):
             # print("vel",entity.state.p_vel)
             entity.state.p_dist += np.linalg.norm(entity.state.p_vel * self.dt)
             entity.state.time += self.dt
-
-    def update_agent_state(self, agent:Agent):
+    def update_agent_min_relative_distance(self):
+        agents_positions = [agent.state.p_pos for agent in self.agents]
+        agent_relative_distance_matrix = np.inf * np.ones((len(self.agents), len(self.agents)))
+        for i, agent in enumerate(self.agents):
+            if agent.status:
+                continue
+            for j in range(len(self.agents)):
+                if i == j:
+                    continue
+                if not self.agents[j].status:
+                    continue
+                agent_relative_distance_matrix[i, j] = np.linalg.norm(agents_positions[i] - agents_positions[j])
+        for i, agent in enumerate(self.agents):
+            agent.min_relative_distance = np.min(agent_relative_distance_matrix[i, :])
+    def update_agent_communication_state(self, agent:Agent):
         # set communication state (directly for now)
         if agent.silent:
             agent.state.c = np.zeros(self.dim_c)

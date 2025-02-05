@@ -94,7 +94,7 @@ After training, you can evaluate the trained agents by running:
 
 ```bash
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/OA' \
+--model_dir='model_weights/FA' \
 --render_episodes=2 \
 --world_size=3 \
 --num_agents=3 \
@@ -103,8 +103,9 @@ python onpolicy/scripts/eval_mpe.py \
 --num_landmarks=3 \
 --episode_length=50 \
 --use_dones=False \
---collaborative=False --model_name='OA' \
---scenario_name='nav_base_formation_graph_nogoal' \
+--collaborative=False --model_name='FA' \
+--scenario_name='nav_fairassign_fairrew_formation_graph' \
+--dynamics_type='double_integrator' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \

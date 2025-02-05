@@ -4,8 +4,9 @@ import numpy as np
 import math
 import random
 from typing import Callable, List, Tuple, Dict, Union, Optional
-from multiagent.core import World, Agent, is_list_of_lists
+from multiagent.core import EntityDynamicsType, World, Agent, is_list_of_lists
 from multiagent.multi_discrete import MultiDiscrete
+from multiagent.config import DoubleIntegratorConfig, UnicycleVehicleConfig
 
 # update bounds to center around agent
 cam_range = 2
@@ -24,10 +25,12 @@ class MultiAgentBaseEnv(gym.Env):
 					reward_callback:Callable=None,
 					observation_callback:Callable=None, 
 					info_callback:Callable=None,
-					done_callback:Callable=None, 
+					done_callback:Callable=None,
+					agent_reached_goal_callback:Callable=None,
 					shared_viewer:bool=True, 
 					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
+					scenario_name:str='navigation',
+					dynamics_type:str='unicycle_vehicle') -> None:
 		self.world = world
 		self.world_length = self.world.world_length
 		self.current_step = 0
@@ -42,11 +45,30 @@ class MultiAgentBaseEnv(gym.Env):
 		self.observation_callback = observation_callback
 		self.info_callback = info_callback
 		self.done_callback = done_callback
+		self.agent_reached_goal_callback = agent_reached_goal_callback
+		# print("done_callback: ", done_callback)
 		self.scenario_name = scenario_name
+
+		self.world_size = self.world.world_size
+
 		# environment parameters
 		# self.discrete_action_space = True
 		self.discrete_action_space = discrete_action
 
+		if dynamics_type == 'unicycle_vehicle':
+			self.dynamics_type = EntityDynamicsType.UnicycleVehicleXY
+			self.num_accel_options = UnicycleVehicleConfig.MOTION_PRIM_ACCEL_OPTIONS
+			self.num_angle_rate_options = UnicycleVehicleConfig.MOTION_PRIM_ANGRATE_OPTIONS
+			self.num_discrete_action = self.num_accel_options * self.num_angle_rate_options
+		elif dynamics_type == 'double_integrator':
+			self.dynamics_type = EntityDynamicsType.DoubleIntegratorXY
+
+			# self.num_accel_y_options = DoubleIntegratorConfig.ACCELY_OPTIONS
+			# self.num_accel_x_options = DoubleIntegratorConfig.ACCELX_OPTIONS
+			# self.num_discrete_action = self.num_accel_x_options * self.num_accel_y_options
+			self.num_discrete_action = self.world.total_actions
+		else:
+			raise NotImplementedError
 		# if true, action is a number 0...N, 
 		# otherwise action is a one-hot N-dimensional vector
 		self.discrete_action_input = False
@@ -123,7 +145,7 @@ class MultiAgentBaseEnv(gym.Env):
 				total_action_space = []
 				# physical action space
 				if self.discrete_action_space:
-					u_action_space = spaces.Discrete(world.total_actions)
+					u_action_space = spaces.Discrete(self.num_discrete_action)
 				else:
 					u_action_space = spaces.Box(low=-agent.u_range, 
 												high=+agent.u_range, 
@@ -247,6 +269,49 @@ class MultiAgentBaseEnv(gym.Env):
 			return 0.0
 		return self.reward_callback(agent, self.world)
 
+	def decode_action_index(self, action_index):
+		""" action_index: numpy array of the index of the action in the action space
+		"""
+		if self.dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+			max_angular_rate = UnicycleVehicleConfig.ANGULAR_RATE_MAX
+			max_accel = UnicycleVehicleConfig.ACCEL_MAX
+			min_accel = UnicycleVehicleConfig.ACCEL_MIN
+			accel_options = np.linspace(min_accel, max_accel, self.num_accel_options)
+			angle_rate_options = np.linspace(-max_angular_rate, max_angular_rate, self.num_angle_rate_options)
+			angle_rate_index = action_index // self.num_accel_options
+			accel_index = action_index % self.num_accel_options
+			# Initialize the output array with the correct shape
+			u = np.zeros((*action_index.shape, self.world.dim_p))
+
+			# Use advanced indexing to fill in the values
+			u[..., 0] = angle_rate_options[angle_rate_index]
+			u[..., 1] = accel_options[accel_index]
+		elif self.dynamics_type == EntityDynamicsType.DoubleIntegratorXY:
+
+			#############################################
+			## previous setup
+
+			print("action_index: ", action_index)
+			############################################
+			## new setup
+			# max_accel_x = DoubleIntegratorConfig.ACCELX_MAX
+			# min_accel_x = DoubleIntegratorConfig.ACCELX_MIN
+			# max_accel_y = DoubleIntegratorConfig.ACCELY_MAX
+			# min_accel_y = DoubleIntegratorConfig.ACCELY_MIN
+			# accel_x_options = np.linspace(min_accel_x, max_accel_x, self.num_accel_x_options)
+			# accel_y_options = np.linspace(min_accel_y, max_accel_y, self.num_accel_y_options)
+			# accel_x_index = action_index // self.num_accel_y_options #check
+			# accel_y_index = action_index % self.num_accel_y_options #check
+
+			# u = np.zeros((*action_index.shape, self.world.dim_p))
+
+			# u[..., 0] = accel_x_options[accel_x_index]
+			# u[..., 1] = accel_y_options[accel_y_index]
+			#################################################
+		else:
+			raise NotImplementedError
+		return u
+
 	# set env action for a particular agent
 	def _set_action(self, action, agent:Agent, action_space, 
 					time:Optional=None) -> None:
@@ -270,6 +335,8 @@ class MultiAgentBaseEnv(gym.Env):
 		if agent.movable:
 			# physical action
 			# print(f'discrete_action_input: {self.discrete_action_input}, force_discrete_action: {self.force_discrete_action}, discrete_action_space: {self.discrete_action_space}')
+			action_description = ""
+
 			if self.discrete_action_input:
 				agent.action.u = np.zeros(self.world.dim_p)
 				if self.world.total_actions ==5:
@@ -308,12 +375,53 @@ class MultiAgentBaseEnv(gym.Env):
 					action[0][:] = 0.0
 					action[0][d] = 1.0
 				if self.discrete_action_space:
-					if len(action[0]) == 5:
-						agent.action.u[0] += action[0][1] - action[0][2]
-						agent.action.u[1] += action[0][3] - action[0][4]
-					elif len(action[0]) == 9:
-						active_action = np.argmax(action[0])  # find the index of the selected action
-						agent.action.u = action_map[active_action]
+
+					if self.dynamics_type == EntityDynamicsType.DoubleIntegratorXY:
+
+						############################################
+						## previous setup
+
+						if len(action[0]) == 5:
+							agent.action.u[0] += action[0][1] - action[0][2]
+							agent.action.u[1] += action[0][3] - action[0][4]
+						elif len(action[0]) == 9:
+							active_action = np.argmax(action[0])  # find the index of the selected action
+							agent.action.u = action_map[active_action]
+
+						############################################
+						##  new setup
+						# accel_x_max = DoubleIntegratorConfig.ACCELX_MAX
+						# accel_y_max = DoubleIntegratorConfig.ACCELY_MAX
+						# accel_x_options = np.linspace(-accel_x_max, accel_x_max, self.num_accel_x_options)
+						# accel_y_options = np.linspace(-accel_y_max, accel_y_max, self.num_accel_y_options)
+						# action_index = np.argmax(action[0])
+						# accel_x_index = int(action_index // self.num_accel_y_options)
+						# accel_y_index = int(action_index - accel_x_index * self.num_accel_y_options)
+						# agent.action.u[0] = accel_x_options[accel_x_index]
+						# agent.action.u[1] = accel_y_options[accel_y_index]
+						# action_description = f"accel x: {agent.action.u[0]}, y: {agent.action.u[1]}"
+						#################################################
+					elif self.dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+						agent.action.u = np.zeros(self.world.dim_p)
+						max_angular_rate = UnicycleVehicleConfig.ANGULAR_RATE_MAX
+						max_accel = UnicycleVehicleConfig.ACCEL_MAX
+						min_accel = UnicycleVehicleConfig.ACCEL_MIN
+						accel_options = np.linspace(min_accel, max_accel, self.num_accel_options)
+						angle_rate_options = np.linspace(-max_angular_rate, max_angular_rate, self.num_angle_rate_options)
+						action_index = np.argmax(action[0])
+						angle_rate_index = int(action_index // self.num_accel_options)
+						accel_index = int(action_index - angle_rate_index * self.num_accel_options)
+						agent.action.u[0] = angle_rate_options[angle_rate_index]
+						agent.action.u[1] = accel_options[accel_index]
+						action_description = f"turn: {agent.action.u[0]}, accel: {agent.action.u[1]}"
+					else:
+						raise NotImplementedError
+					# if len(action[0]) == 5:
+					# 	agent.action.u[0] += action[0][1] - action[0][2]
+					# 	agent.action.u[1] += action[0][3] - action[0][4]
+					# elif len(action[0]) == 9:
+					# 	active_action = np.argmax(action[0])  # find the index of the selected action
+					# 	agent.action.u = action_map[active_action]
 				else:
 					agent.action.u = action[0]
 			sensitivity = 5.0
@@ -541,6 +649,13 @@ class MultiAgentBaseEnv(gym.Env):
 					dx.append(np.array([x,y]))
 		return dx
 
+	@staticmethod
+	def is_collision(agent1:Agent, agent2:Agent, dist_min: Optional[float] = None) -> bool:
+		delta_pos = agent1.state.p_pos - agent2.state.p_pos
+		dist = np.linalg.norm(delta_pos)
+		if dist_min is None:
+			dist_min = 1.05*(agent1.size + agent2.size)
+		return True if dist < dist_min else False
 
 class MultiAgentGraphEnv(MultiAgentBaseEnv):
 	metadata = {
@@ -590,18 +705,38 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 					id_callback:Callable=None,
 					info_callback:Callable=None,
 					done_callback:Callable=None,
+					agent_reached_goal_callback:Callable=None,
 					update_graph:Callable=None,
 					shared_viewer:bool=True, 
 					discrete_action:bool=True,
-					scenario_name:str='navigation') -> None:
+					scenario_name:str='navigation',
+					dynamics_type:str='double_integrator') -> None:
 		super(MultiAgentGraphEnv, self).__init__(world, reset_callback, 
 											reward_callback,observation_callback, 
-											info_callback,done_callback, 
+											info_callback,done_callback, agent_reached_goal_callback,
 											shared_viewer, discrete_action,
-											scenario_name)
+											scenario_name, dynamics_type)
 		self.update_graph = update_graph
 		self.graph_observation_callback = graph_observation_callback
 		self.id_callback = id_callback
+
+		# variabls to save episode data
+		self.dt = self.world.dt
+		self.episode_length = self.world.world_length
+		self.coordination_range = self.world.coordination_range
+		# This are the values saved in info. (static per each episode)
+		# travel metric
+		self.prev_episode_travel_time_mean = self.world.world_length
+		self.prev_episode_travel_distance_mean = 0.0
+		self.prev_episode_done_percentage = 0.0 # percentage between 0 and 1
+		self.prev_episode_num_reached_goal_mean = 0.0
+
+		# travel metric
+		self.episode_agent_travel_length_list = None
+		self.episode_agent_travel_distance_list = None
+		self.episode_agent_done_list = None
+
+
 		self.set_graph_obs_space()
 
 	def set_graph_obs_space(self):
@@ -654,7 +789,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 		# advance world state
 		self.world.step()
 		# record observation for each agent
-		for agent in self.agents:
+		for (i, agent) in enumerate(self.agents):
 			obs_n.append(self._get_obs(agent))
 			agent_id_n.append(self._get_id(agent))
 

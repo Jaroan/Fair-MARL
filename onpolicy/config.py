@@ -175,6 +175,8 @@ def get_config():
     ## action space params
     parser.add_argument("--total_actions", type=int,
                         default=5,help="choice of action space")    
+    parser.add_argument("--dynamics_type", type=str,
+                        default=False, help="Agent's dynamics type: 'unicycle_vehicle', 'double_integrator'")
 
     ## fairness params
     parser.add_argument("--fair_wt", type=int,
