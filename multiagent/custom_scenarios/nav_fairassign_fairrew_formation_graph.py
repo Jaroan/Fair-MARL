@@ -266,8 +266,8 @@ class Scenario(BaseScenario):
 				agent.color = np.array([0.35, 0.35, 0.85])
 			else:
 				agent.color = np.array([0.85, 0.85, 0.25])
-			if i == 0:
-				agent.color = np.array([0.15, 0.75, 0.65])
+			# if i == 0:
+			# 	agent.color = np.array([0.15, 0.75, 0.65])
 			agent.state.p_dist = 0.0
 			agent.state.time = 0.0
 		# set colours for scripted agents
@@ -283,8 +283,8 @@ class Scenario(BaseScenario):
 				landmark.color =  np.array([0.35, 0.35, 0.85])
 			else:
 				landmark.color = np.array([0.85, 0.85, 0.25])
-			if i == 0:
-				landmark.color = np.array([0.15, 0.75, 0.65])
+			# if i == 0:
+			# 	landmark.color = np.array([0.15, 0.75, 0.65])
 		# set colours for scripted agents goals
 		for i, landmark in enumerate(world.scripted_agents_goals):
 			landmark.color = np.array([0.15, 0.95, 0.15])
@@ -639,6 +639,7 @@ class Scenario(BaseScenario):
 		dist_to_fair_goal = np.linalg.norm(agent.state.p_pos - self.landmark_poses[self.goal_match_index[agent.id]])
 
 		if dist_to_fair_goal < self.min_dist_thresh:
+			# print("Agent",agent.id,"reached fair goal")
 			if agent.status ==False:
 				agent.status = True
 				agent.state.reset_velocity()
@@ -684,7 +685,6 @@ class Scenario(BaseScenario):
 		# get goal occupied flag for that goal
 		second_closest_goal_occupied = np.array([self.landmark_poses_occupied[top_two_indices[1]]])
 		if min_dist < self.min_obs_dist:
-			# If the minimum distance is already less than self.min_dist_thresh, use the previous goal.
 			# If the minimum distance is already less than self.min_obs_dist, use the previous goal.
 			chosen_goal = np.argmin(world.dists)
 			agents_goal = self.landmark_poses[chosen_goal]
@@ -713,7 +713,7 @@ class Scenario(BaseScenario):
 				# print("Ag",agent.id," AT GOAL",np.min(world.dists), "goal_occupied",self.landmark_poses_occupied[chosen_goal])
 
 			else:
-				# goal_proximity is finding how many agents are nearthi chosen goal
+				# goal_proximity is finding how many agents are near this chosen goal
 				goal_proximity = np.array([np.linalg.norm(agents_goal - agent.state.p_pos)  for agent in world.agents])
 				# print("Agent",agent.id,"chosen_goal", chosen_goal, "goal_proximity",goal_proximity, "flags",self.landmark_poses_occupied, "history",self.goal_history)
 				closest_dist_to_goal = np.min(goal_proximity)
@@ -730,12 +730,15 @@ class Scenario(BaseScenario):
 						## Add case when all nearby observed goals are occupied
 						unoccupied_goals = self.landmark_poses[self.landmark_poses_occupied!= 1]
 						unoccupied_goals_indices = np.where(self.landmark_poses_occupied != 1)[0]
-						assert len(unoccupied_goals) > 0, "All goals are occupied"
+						# print ("Agent",agent.id,"unoccupied_goals",unoccupied_goals, "unoccupied_goals_indices",unoccupied_goals_indices)
+						assert len(unoccupied_goals) > 0, f"All goals are occupied {self.landmark_poses_occupied}"
+						# input("Press Enter to continue...")
 						chosen_goal = np.argmin(np.linalg.norm(agent.state.p_pos - unoccupied_goals, axis=1))
 						agents_goal = unoccupied_goals[chosen_goal]
 
 					else:
-
+						## add assertion to see if no goal is falsely occupied
+						# assert not np.any(goal_proximity < self.min_dist_thresh), f"Agent {agent.id} is not at goal {chosen_goal} but flag is set to occupied"
 						self.landmark_poses_occupied[chosen_goal] = 1.0-closest_dist_to_goal
 
 				# another agent already at goal, can't overwrite the flag
