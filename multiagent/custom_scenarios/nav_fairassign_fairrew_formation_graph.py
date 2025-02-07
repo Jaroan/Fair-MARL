@@ -355,7 +355,7 @@ class Scenario(BaseScenario):
 			if num_agents_added == self.num_agents:
 				break
 			# for random pos
-			random_pos = np.random.uniform(-self.world_size/2, 
+			random_pos = boundary_thresh*np.random.uniform(-self.world_size/2, 
 											self.world_size/2, 
 											world.dim_p)
 
@@ -385,7 +385,7 @@ class Scenario(BaseScenario):
 				break
 
 			# for random pos
-			random_pos = 0.8 * np.random.uniform(-self.world_size/2, 
+			random_pos = 0.5 * np.random.uniform(-self.world_size/2, 
 												self.world_size/2, 
 												world.dim_p)
 
@@ -644,6 +644,7 @@ class Scenario(BaseScenario):
 				agent.status = True
 				agent.state.reset_velocity()
 				rew += self.goal_rew
+				print("Agent",agent.id,"reached fair goal")
 
 		else:
 				rew -= dist_to_fair_goal
