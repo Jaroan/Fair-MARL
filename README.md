@@ -94,7 +94,7 @@ After training, you can evaluate the trained agents by running:
 
 ```bash
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA' \
+--model_dir='model_weights/FA_FR/unicycle_model' \
 --render_episodes=2 \
 --world_size=3 \
 --num_agents=3 \
@@ -105,7 +105,7 @@ python onpolicy/scripts/eval_mpe.py \
 --use_dones=False \
 --collaborative=False --model_name='FA' \
 --scenario_name='nav_fairassign_fairrew_formation_graph' \
---dynamics_type='double_integrator' \
+--dynamics_type='unicycle_vehicle' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \
