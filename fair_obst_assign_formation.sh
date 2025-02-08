@@ -82,7 +82,7 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --num_mini_batch 1 \
 --episode_length ${episode_length} \
 --total_actions 9 \
---num_env_steps 5000000 \
+--num_env_steps 10000000 \
 --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 \
 --user_name "marl" \
 --use_cent_obs "False" \
