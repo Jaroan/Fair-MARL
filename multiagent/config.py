@@ -35,7 +35,7 @@ class DoubleIntegratorConfig():
     ACCELX_OPTIONS = 3 # double check appropriate value
     ACCELY_OPTIONS = 3 # double check appropriate value
     DT = 0.1
-    DISTANCE_TO_GOAL_THRESHOLD = 0.2 # m
+    DISTANCE_TO_GOAL_THRESHOLD = 0.05 # m
     # separation distance between agents for safety
     COLLISION_DISTANCE = 0.5
     # communication distance (entities within this distance are considered in each agent's observations)

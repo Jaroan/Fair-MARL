@@ -60,14 +60,20 @@ if __name__=='__main__':
     # goals = rng.random((n,2))
     # agents = rng.random((n,2))
 
-    goals = np.array([[0.,-0.5],[0.45,-0.5],[0.9,-0.5]])
-    agents = np.array([[-0.9,-0.9],[-0.9,0.],[-0.9,0.9]])
+    # goals = np.array([[0.,-0.5],[0.45,-0.5],[0.9,-0.5]])
+    # agents = np.array([[-0.9,-0.9],[-0.9,0.],[-0.9,0.9]])
+
+
+    goals = np.array([[0, 1.5], [0.75, 1.5], [1.5, 1.5]])
+    agents = np.array([[-1.5, 0], [-1.5, -0.75], [-1.5, -1.5]])
     print(goals.shape)
+    
     # goals = # FILL ME (n-by-2 np.ndarray)
     # agents = # FILL ME (n-by-2 np.ndarray)
 
     costs = dist.cdist(agents, goals)
+    print("costs",costs)
     x, objs = solve_fair_assignment(costs)
-    # print(x)
-    # print(objs)
+    print("x",x)
+    print("objs",objs)
     

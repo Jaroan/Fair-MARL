@@ -16,8 +16,9 @@ sys.path.append(os.path.abspath(os.getcwd()))
 from scipy.optimize import linear_sum_assignment
 import scipy.spatial.distance as dist
 from marl_fair_assign import solve_fair_assignment
-from multiagent.core import World, Agent, Landmark, Entity, Wall
+from multiagent.core import EntityDynamicsType, World, Agent, Landmark, Entity, Wall
 from multiagent.scenario import BaseScenario
+from multiagent.config import UnicycleVehicleConfig, DoubleIntegratorConfig
 
 
 entity_mapping = {'agent': 0, 'landmark': 1, 'obstacle':2, 'wall':3}
@@ -82,7 +83,17 @@ class Scenario(BaseScenario):
 		self.use_dones = args.use_dones
 		self.episode_length = args.episode_length
 		self.total_actions = args.total_actions
+		if args.dynamics_type == 'unicycle_vehicle':
+			self.dynamics_type = EntityDynamicsType.UnicycleVehicleXY
+			self.config_class = UnicycleVehicleConfig
+			self.min_turn_radius = 0.5 * (UnicycleVehicleConfig.V_MAX + UnicycleVehicleConfig.V_MIN) / UnicycleVehicleConfig.ANGULAR_RATE_MAX
 
+		elif args.dynamics_type == 'double_integrator':
+			self.dynamics_type = EntityDynamicsType.DoubleIntegratorXY
+			self.config_class = DoubleIntegratorConfig
+			self.min_turn_radius = 0.0
+		else:
+			raise NotImplementedError
 		# fairness args
 		# self.fair_wt = args.fair_wt
 		self.fair_rew = args.fair_rew
@@ -101,7 +112,7 @@ class Scenario(BaseScenario):
 		else:
 			self.max_edge_dist = args.max_edge_dist
 		####################
-		world = World(total_actions=self.total_actions)
+		world = World(dynamics_type=self.dynamics_type,total_actions=self.total_actions )
 		# graph related attributes
 		world.cache_dists = True # cache distance between all entities
 		world.graph_mode = True
@@ -120,7 +131,7 @@ class Scenario(BaseScenario):
 
 		# add agents
 		global_id = 0
-		world.agents = [Agent() for i in range(self.num_agents)]
+		world.agents = [Agent(self.dynamics_type) for i in range(self.num_agents)]
 		world.scripted_agents = [Agent() for _ in range(self.num_scripted_agents)]
 		for i, agent in enumerate(world.agents + world.scripted_agents):
 			agent.id = i
@@ -167,6 +178,8 @@ class Scenario(BaseScenario):
 			
 		self.zeroshift = args.zeroshift
 		self.reset_world(world)
+		world.world_size = self.world_size
+
 		return world
 
 	def reset_world(self, world:World) -> None:
