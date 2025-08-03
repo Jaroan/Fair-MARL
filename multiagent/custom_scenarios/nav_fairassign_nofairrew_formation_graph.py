@@ -784,10 +784,13 @@ class Scenario(BaseScenario):
 						continue
 					else:
 						# print("Agent",agent.id,"Nearby goal",goal, "is shown occupied but no agent is at goal")
-						self.landmark_poses_occupied[goal] = np.min(goal_proximity)
+						self.landmark_poses_occupied[goal] = 1 - np.min(goal_proximity)
 
 			if min_dist < self.min_dist_thresh:
-				self.landmark_poses_occupied[chosen_goal] = 1.0
+				if agent.status == True:
+					self.landmark_poses_occupied[chosen_goal] = 1.0
+				else:
+					self.landmark_poses_occupied[chosen_goal] = 1.0-min_dist
 				self.goal_history[chosen_goal] = agent.id
 			else:
 				# goal_proximity is finding how many agents are nearthi chosen goal

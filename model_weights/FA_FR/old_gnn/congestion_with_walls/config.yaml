@@ -1,11 +1,5 @@
 wandb_version: 1
 
-total_actions:
-  desc: null
-  value: 9
-dynamics_type:
-  desc: null
-  value: double_integrator
 fair_wt:
   desc: null
   value: 1
@@ -27,18 +21,15 @@ increase_fairness:
 min_obs_dist:
   desc: null
   value: 0.5
-model_name:
-  desc: null
-  value: FA_FR
 algorithm_name:
   desc: null
   value: rmappo
 project_name:
   desc: null
-  value: walls_double_integrator_3
+  value: fair_test_3
 experiment_name:
   desc: null
-  value: di_250417_000719_fafr_eplen25_haswalls_formation_nocollab_1Fair_30goal_5mil
+  value: tanh5_fairassign_fairrew_fixedassignwallmask_onegoal_mingoalgraphobs_mingoaldist_formation_nocollab_GoalMatch_1Fair_30goal_5mil
 seed:
   desc: null
   value: 0
@@ -77,7 +68,7 @@ use_obs_instead_of_state:
   value: false
 world_size:
   desc: null
-  value: 4.0
+  value: 2
 num_scripted_agents:
   desc: null
   value: 0
@@ -343,29 +334,25 @@ _wandb:
   desc: null
   value:
     code_path: code/onpolicy/scripts/train_mpe.py
-    python_version: 3.9.15
-    cli_version: 0.15.4
-    framework: torch
+    python_version: 3.8.13
+    cli_version: 0.10.31
+    framework: huggingface
     is_jupyter_run: false
     is_kaggle_kernel: false
-    start_time: 1744862842.343038
+    start_time: 1716960275.0
     t:
       1:
       - 1
-      - 55
       2:
       - 1
-      - 55
-      - 77
+      - 9
+      - 11
       3:
       - 2
       - 4
-      - 13
-      - 16
-      - 23
       - 37
       - 42
-      4: 3.9.15
-      5: 0.15.4
+      4: 3.8.13
+      5: 0.10.31
       8:
       - 5

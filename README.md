@@ -94,23 +94,23 @@ After training, you can evaluate the trained agents by running:
 
 ```bash
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA_FR/unicycle_model' \
+--model_dir='model_weights/FA_FR/congestion_with_walls' \
 --render_episodes=2 \
 --world_size=3 \
 --num_agents=3 \
---num_obstacles=0 \
+--num_obstacles=2 \
 --seed=0 \
 --num_landmarks=3 \
 --episode_length=50 \
 --use_dones=False \
 --collaborative=False --model_name='FA' \
 --scenario_name='nav_fairassign_fairrew_formation_graph' \
---dynamics_type='unicycle_vehicle' \
+--dynamics_type='double_integrator' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \
 --use_render \
---num_walls=0 \
+--num_walls=1 \
 --zeroshift=5 \
 --min_obs_dist 0.5 \
 --total_actions 5
