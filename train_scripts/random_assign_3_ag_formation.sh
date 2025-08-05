@@ -3,7 +3,7 @@
 # to train informarl (the graph version; aka our method)
 
 # Slurm sbatch options
-#SBATCH --job-name random
+#SBATCH --job-name unicycle
 #SBATCH -a 0-1
 #SBATCH --gres=gpu:volta:1
 ##SBATCH --cpus-per-task=48
@@ -14,8 +14,8 @@
 
 # Loading the required module
 source /etc/profile
-module load anaconda/2022a
-export LD_LIBRARY_PATH=/state/partition1/llgrid/pkg/anaconda/anaconda3-2022a/lib:$LD_LIBRARY_PATH
+module load anaconda/2023a
+# export LD_LIBRARY_PATH=/state/partition1/llgrid/pkg/anaconda/anaconda3-2022a/lib:$LD_LIBRARY_PATH
 
 logs_folder="out_informarl3"
 mkdir -p $logs_folder
@@ -24,21 +24,37 @@ mkdir -p $logs_folder
 seed_max=2
 
 n_agents=3
-
+# "double_integrator" or "unicycle_vehicle"
+dynamics_type="unicycle_vehicle"
 seeds=(0 1)
+datetime_str=$(date '+%y%m%d_%H%M%S')
 
+if [ "$dynamics_type" == "unicycle_vehicle" ]; then
+    str_dynamics_type="uv"
+    world_size=4
+elif [ "$dynamics_type" == "double_integrator" ]; then
+    str_dynamics_type="di"
+    world_size=4
+else
+    echo "Error: Unsupported dynamics type '$dynamics_type'"
+    exit 1  # Exit with a non-zero status to indicate an error
+fi
+
+echo "datetime_str: ${datetime_str}"
+echo "dynamics_type: ${dynamics_type}"
 # for seed in `seq ${seed_max}`;
 # do
 # # seed=`expr ${seed} + 3`
 # echo "seed: ${seed}"
 # execute the script with different params
 python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
---project_name "speedup_efficiency_tests_${n_agents}" \
+--project_name "unicycle_dynamics_${n_agents}" \
 --env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seeds[$SLURM_ARRAY_TASK_ID]} \
---experiment_name "randomgoal_nocollab_30goal_5mil" \
+--experiment_name "${str_dynamics_type}_${datetime_str}_randomgoal_nocollab_30goal_5mil" \
 --scenario_name "nav_base_formation_graph_randomgoal" \
+--dynamics_type ${dynamics_type} \
 --num_agents=${n_agents} \
 --num_landmarks=${n_agents} \
 --collision_rew 30 \
@@ -55,8 +71,10 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --collaborative "False" \
 --goal_rew 30 \
 --num_walls 0 \
+--world_size=${world_size} \
+
 --auto_mini_batch_size --target_mini_batch_size 8192 \
-&> $logs_folder/out_nav_graph_randomgoal_nocollab_30goal_5mil_${seeds[$SLURM_ARRAY_TASK_ID]}
+&> $logs_folder/${str_dynamics_type}_${datetime_str}_nav_graph_randomgoal_nocollab_30goal_5mil_${seeds[$SLURM_ARRAY_TASK_ID]}
 
 
 # python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \

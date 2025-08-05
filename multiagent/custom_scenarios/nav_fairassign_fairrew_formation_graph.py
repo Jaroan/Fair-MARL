@@ -104,6 +104,7 @@ class Scenario(BaseScenario):
 		self.goal_rew = args.goal_rew
 		self.min_dist_thresh = args.min_dist_thresh
 		self.min_obs_dist = args.min_obs_dist
+		self.total_actions = args.total_actions
 
 		self.use_dones = args.use_dones
 		self.episode_length = args.episode_length
@@ -150,7 +151,7 @@ class Scenario(BaseScenario):
 		# 	self.max_edge_dist = args.max_edge_dist
 		self.max_edge_dist = self.coordination_range
 		####################
-		world = World(dynamics_type=self.dynamics_type)
+		world = World(dynamics_type=self.dynamics_type, total_actions=self.total_actions)
 		# graph related attributes
 		world.cache_dists = True # cache distance between all entities
 		world.graph_mode = True
@@ -163,7 +164,7 @@ class Scenario(BaseScenario):
 		world.dists_to_goal = -1 * np.ones(self.num_agents)
 		# set any world properties
 		world.dim_c = 2
-		self.num_landmarks = args.num_landmarks # no. of goals equal to no. of agents
+		self.num_landmarks = args.num_landmarks  # no. of goals equal to no. of agents
 		num_scripted_agents_goals = self.num_scripted_agents
 		world.collaborative = args.collaborative
 		#############
@@ -383,9 +384,8 @@ class Scenario(BaseScenario):
 		while True:
 			if num_goals_added == self.num_landmarks:
 				break
-
-			# for random pos
-			random_pos = 0.5 * np.random.uniform(-self.world_size/2, 
+			### for random pos
+			random_pos = boundary_thresh * np.random.uniform(-self.world_size/2, 
 												self.world_size/2, 
 												world.dim_p)
 
@@ -493,7 +493,6 @@ class Scenario(BaseScenario):
 		agent_info = {
 			'Dist_to_goal': world.dist_left_to_goal[agent.id],
 			'Time_req_to_goal': world.times_required[agent.id],
-			# NOTE: total agent collisions is half since we are double counting. # EDIT corrected this.
 			'Num_agent_collisions': world.num_agent_collisions[agent.id], 
 			'Num_obst_collisions': world.num_obstacle_collisions[agent.id],
 			'Distance_mean': world.dist_traveled_mean, 
@@ -523,7 +522,7 @@ class Scenario(BaseScenario):
 
 			if dist < dist_min:
 				collision = True
-				break	
+				break
 		
 		# check collision with walls
 		for wall in world.walls:
@@ -640,11 +639,11 @@ class Scenario(BaseScenario):
 
 		if dist_to_fair_goal < self.min_dist_thresh:
 			# print("Agent",agent.id,"reached fair goal")
-			if agent.status ==False:
+			if agent.status is False:
 				agent.status = True
 				agent.state.reset_velocity()
 				rew += self.goal_rew
-				print("Agent",agent.id,"reached fair goal")
+				# print("Agent",agent.id,"reached fair goal")
 
 		else:
 				rew -= dist_to_fair_goal
@@ -735,7 +734,7 @@ class Scenario(BaseScenario):
 						unoccupied_goals = self.landmark_poses[self.landmark_poses_occupied!= 1]
 						unoccupied_goals_indices = np.where(self.landmark_poses_occupied != 1)[0]
 						# print ("Agent",agent.id,"unoccupied_goals",unoccupied_goals, "unoccupied_goals_indices",unoccupied_goals_indices)
-						assert len(unoccupied_goals) > 0, f"All goals are occupied {self.landmark_poses_occupied}, {self.goal_history},{world.dists} {goal_proximity}"
+						# assert len(unoccupied_goals) > 0, f"All goals are occupied {self.landmark_poses_occupied}, {self.goal_history},{world.dists} {goal_proximity}"
 						# input("Press Enter to continue...")
 						chosen_goal = np.argmin(np.linalg.norm(agent.state.p_pos - unoccupied_goals, axis=1))
 						agents_goal = unoccupied_goals[chosen_goal]

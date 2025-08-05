@@ -1,3 +1,7 @@
+# Evaluate a trained FA_FR model on the unicycle vehicle scenario with 3 agents and 3 landmarks.
+# The script will render the episodes and save GIFs of the evaluation.
+# The model directory and parameters are specified in the command line arguments.
+
 python onpolicy/scripts/eval_mpe.py \
 --model_dir='model_weights/FA_FR/unicycle_model' \
 --render_episodes=2 \
@@ -10,6 +14,30 @@ python onpolicy/scripts/eval_mpe.py \
 --use_dones=False \
 --collaborative=False --model_name='FA' \
 --scenario_name='nav_fairassign_fairrew_formation_graph' \
+--dynamics_type='unicycle_vehicle' \
+--goal_rew=30 \
+--fair_rew=1 \
+--save_gifs \
+--use_render \
+--num_walls=0 \
+--zeroshift=5 \
+--min_obs_dist 0.5 \
+--total_actions 5
+
+# 
+
+python onpolicy/scripts/eval_mpe.py \
+--model_dir='model_weights/FA_FR/unicycle_model' \
+--render_episodes=2 \
+--world_size=3 \
+--num_agents=3 \
+--num_obstacles=0 \
+--seed=0 \
+--num_landmarks=3 \
+--episode_length=50 \
+--use_dones=False \
+--collaborative=False --model_name='OA' \
+--scenario_name='nav_base_formation_graph_mask' \
 --dynamics_type='unicycle_vehicle' \
 --goal_rew=30 \
 --fair_rew=1 \

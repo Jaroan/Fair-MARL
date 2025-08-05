@@ -509,7 +509,45 @@ class MultiAgentBaseEnv(gym.Env):
 				entity_comm_geoms = []
 
 				if 'agent' in entity.name:
-					geom.set_color(*entity.color, alpha=0.8)
+					if self.dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+
+						width = entity.size*2
+						height = entity.size
+						theta = entity.state.theta
+						entity.initial_theta = theta
+
+						base_size = entity.size
+
+						vertices = np.array([
+							[2 * entity.size, 0],       # Nose
+							[0.8 * entity.size, entity.size],    # Right wingtip
+							[0.4 * entity.size, 0.4 * entity.size],  # Right wing inner
+							[-0.5 * entity.size, 0.6 * entity.size], # Tail right
+							[-entity.size, 0],          # Tail center
+							[-0.5 * entity.size, -0.6 * entity.size], # Tail left
+							[0.4 * entity.size, -0.4 * entity.size],  # Left wing inner
+							[0.8 * entity.size, -entity.size],   # Left wingtip
+						])
+
+						# Create rotation matrix (if you want to keep initial rotation)
+						rotation_matrix = np.array([
+							[np.cos(theta), -np.sin(theta)],
+							[np.sin(theta), np.cos(theta)]
+						])
+
+						# Apply rotation to vertices
+						rotated_vertices = np.dot(vertices, rotation_matrix.T)
+						geom = rendering.make_polygon(rotated_vertices)
+
+						# geom = rendering.make_circle(entity.size)
+						xform = rendering.Transform()
+
+						geom.set_color(*entity.color, alpha=0.8)
+
+					elif self.dynamics_type == EntityDynamicsType.DoubleIntegratorXY:
+						geom.set_color(*entity.color, alpha=0.8)
+					else:
+						raise NotImplementedError
 
 					if not entity.silent:
 						dim_c = self.world.dim_c
@@ -583,16 +621,20 @@ class MultiAgentBaseEnv(gym.Env):
 				pos = np.zeros(self.world.dim_p)
 			else:
 				pos = self.agents[i].state.p_pos
-			self.viewers[i].set_bounds(pos[0]-cam_range,
-										pos[0]+cam_range,
-										pos[1]-cam_range,
-										pos[1]+cam_range)
+			self.viewers[i].set_bounds(pos[0]-self.world.world_size,
+										pos[0]+self.world.world_size,
+										pos[1]-self.world.world_size,
+										pos[1]+self.world.world_size)
 			# update geometry positions
 			for e, entity in enumerate(self.world.entities):
 				self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
 				if 'agent' in entity.name:
 					self.render_geoms[e].set_color(*entity.color, alpha=0.8)
+					# Get the change in orientation
+					delta_theta = entity.state.theta - entity.initial_theta
 
+					self.render_geoms_xform[e].set_rotation(delta_theta)
+					self.render_geoms[e].set_color(*entity.color, alpha=0.8)
 					if not entity.silent:
 						for ci in range(self.world.dim_c):
 							color = 1 - entity.state.c[ci]
