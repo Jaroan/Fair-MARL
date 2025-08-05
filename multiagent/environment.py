@@ -630,11 +630,12 @@ class MultiAgentBaseEnv(gym.Env):
 				self.render_geoms_xform[e].set_translation(*entity.state.p_pos)
 				if 'agent' in entity.name:
 					self.render_geoms[e].set_color(*entity.color, alpha=0.8)
-					# Get the change in orientation
-					delta_theta = entity.state.theta - entity.initial_theta
+					if self.dynamics_type == EntityDynamicsType.UnicycleVehicleXY:
+						# Get the change in orientation
+						delta_theta = entity.state.theta - entity.initial_theta
 
-					self.render_geoms_xform[e].set_rotation(delta_theta)
-					self.render_geoms[e].set_color(*entity.color, alpha=0.8)
+						self.render_geoms_xform[e].set_rotation(delta_theta)
+						self.render_geoms[e].set_color(*entity.color, alpha=0.8)
 					if not entity.silent:
 						for ci in range(self.world.dim_c):
 							color = 1 - entity.state.c[ci]

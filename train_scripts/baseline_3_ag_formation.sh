@@ -3,7 +3,7 @@
 # to train informarl (the graph version; aka our method)
 
 # Slurm sbatch options
-#SBATCH --job-name unicycle
+#SBATCH --job-name doubleOA
 #SBATCH -a 0-1
 #SBATCH --gres=gpu:volta:1
 ## SBATCH --cpus-per-task=40
@@ -26,7 +26,7 @@ seed_max=2
 n_agents=3
 
 # "double_integrator" or "unicycle_vehicle"
-dynamics_type="unicycle_vehicle"
+dynamics_type="double_integrator"
 
 seeds=(0 1)
 datetime_str=$(date '+%y%m%d_%H%M%S')
@@ -50,20 +50,21 @@ echo "dynamics_type: ${dynamics_type}"
 # echo "seed: ${seed}"
 # execute the script with different params
 python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
---project_name "unicycle_dynamics_${n_agents}" \
+--project_name "double_integrator_${n_agents}" \
 --env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seeds[$SLURM_ARRAY_TASK_ID]} \
---experiment_name "${str_dynamics_type}_${datetime_str}_base_updated_3_agents_30goal_5mil" \
+--experiment_name "${str_dynamics_type}_${datetime_str}_base_walls_3_agents_30goal_5mil" \
 --scenario_name "nav_base_formation_graph_mask" \
 --dynamics_type ${dynamics_type} \
 --num_agents=${n_agents} \
 --num_landmarks=${n_agents} \
+--num_obstacles 3 \
 --collision_rew 30 \
 --n_training_threads 1 --n_rollout_threads 128 \
 --num_mini_batch 1 \
 --episode_length 25 \
---total_actions 9 \
+--total_actions 5 \
 --num_env_steps 5000000 \
 --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 \
 --user_name "marl" \
@@ -72,11 +73,11 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --use_dones "False" \
 --collaborative "False" \
 --goal_rew 30 \
---num_walls 0 \
+--num_walls 2 \
 --zeroshift 5 \
 --world_size=${world_size} \
 --auto_mini_batch_size --target_mini_batch_size 8192 \
-&> $logs_folder/${str_dynamics_type}_${datetime_str}_base_updated_3agents_30goal_5mil_${seeds[$SLURM_ARRAY_TASK_ID]}
+&> $logs_folder/${str_dynamics_type}_${datetime_str}_base_walls_3agents_30goal_5mil_${seeds[$SLURM_ARRAY_TASK_ID]}
 
 
 # python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \

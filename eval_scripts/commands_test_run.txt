@@ -3,18 +3,18 @@
 # The model directory and parameters are specified in the command line arguments.
 
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA_FR/unicycle_model' \
---render_episodes=2 \
+--model_dir='model_weights/FA_FR' \
+--render_episodes=4 \
 --world_size=3 \
 --num_agents=3 \
---num_obstacles=0 \
+--num_obstacles=5 \
 --seed=0 \
 --num_landmarks=3 \
 --episode_length=50 \
 --use_dones=False \
 --collaborative=False --model_name='FA' \
 --scenario_name='nav_fairassign_fairrew_formation_graph' \
---dynamics_type='unicycle_vehicle' \
+--dynamics_type='double_integrator' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \
@@ -27,23 +27,23 @@ python onpolicy/scripts/eval_mpe.py \
 # 
 
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA_FR/unicycle_model' \
---render_episodes=2 \
---world_size=3 \
+--model_dir='model_weights/OA/congestion_with_walls' \
+--render_episodes=1 \
+--world_size=4 \
 --num_agents=3 \
---num_obstacles=0 \
+--num_obstacles=3 \
 --seed=0 \
 --num_landmarks=3 \
 --episode_length=50 \
 --use_dones=False \
 --collaborative=False --model_name='OA' \
 --scenario_name='nav_base_formation_graph_mask' \
---dynamics_type='unicycle_vehicle' \
+--dynamics_type='double_integrator' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \
 --use_render \
---num_walls=0 \
+--num_walls=2 \
 --zeroshift=5 \
 --min_obs_dist 0.5 \
 --total_actions 5
