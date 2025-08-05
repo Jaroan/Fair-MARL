@@ -3,35 +3,36 @@
 # The model directory and parameters are specified in the command line arguments.
 
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/FA_FR' \
+--model_dir='model_weights/FA_FR/congestion_with_walls/new' \
 --render_episodes=4 \
---world_size=3 \
+--world_size=2 \
 --num_agents=3 \
 --num_obstacles=5 \
 --seed=0 \
 --num_landmarks=3 \
---episode_length=50 \
+--episode_length=75 \
 --use_dones=False \
 --collaborative=False --model_name='FA' \
---scenario_name='nav_fairassign_fairrew_formation_graph' \
+--scenario_name='nav_base_formation_graph_nogoal' \
 --dynamics_type='double_integrator' \
 --goal_rew=30 \
 --fair_rew=1 \
 --save_gifs \
 --use_render \
---num_walls=0 \
+--num_walls=2 \
 --zeroshift=5 \
 --min_obs_dist 0.5 \
 --total_actions 5
 
+
 # 
 
 python onpolicy/scripts/eval_mpe.py \
---model_dir='model_weights/OA/congestion_with_walls' \
---render_episodes=1 \
+--model_dir='model_weights/OA/congestion_with_walls/new' \
+--render_episodes=5 \
 --world_size=4 \
 --num_agents=3 \
---num_obstacles=3 \
+--num_obstacles=5 \
 --seed=0 \
 --num_landmarks=3 \
 --episode_length=50 \

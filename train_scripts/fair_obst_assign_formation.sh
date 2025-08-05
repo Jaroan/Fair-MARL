@@ -48,9 +48,13 @@ datetime_str=$(date '+%y%m%d_%H%M%S')
 if [ "$dynamics_type" == "unicycle_vehicle" ]; then
     str_dynamics_type="uv"
     world_size=4
+    episode_length=50
+    num_env_steps=10000000
 elif [ "$dynamics_type" == "double_integrator" ]; then
     str_dynamics_type="di"
     world_size=4
+    episode_length=50
+    num_env_steps=5000000
 else
     echo "Error: Unsupported dynamics type '$dynamics_type'"
     exit 1  # Exit with a non-zero status to indicate an error
@@ -79,9 +83,9 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --collision_rew 30 \
 --n_training_threads 1 --n_rollout_threads 128 \
 --num_mini_batch 1 \
---episode_length 25 \
+--episode_length ${episode_length} \
 --total_actions 5 \
---num_env_steps 5000000 \
+--num_env_steps ${num_env_steps} \
 --ppo_epoch 10 --use_ReLU --gain 0.01 --lr 7e-4 --critic_lr 7e-4 \
 --user_name "marl" \
 --use_cent_obs "False" \
@@ -94,7 +98,7 @@ python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
 --graph_feat_type "relative" \
 --increase_fairness "False" \
 --auto_mini_batch_size --target_mini_batch_size 8192 \
-&> $logs_folder/${str_dynamics_type}_${datetime_str}_fairassign_fairrew_walls_GoalMatch_GPU_1Fair_30goal_5mil_${seeds[$SLURM_ARRAY_TASK_ID]}
+&> $logs_folder/${str_dynamics_type}_${datetime_str}_fairassign_fairrew_walls_GoalMatch_GPU_1Fair_30goal_${seeds[$SLURM_ARRAY_TASK_ID]}
 
 
 # python -u onpolicy/scripts/train_mpe.py --use_valuenorm --use_popart \
