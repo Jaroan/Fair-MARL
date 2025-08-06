@@ -38,7 +38,7 @@ project_name:
   value: double_integrator_3
 experiment_name:
   desc: null
-  value: di_250805_134501_fafr_walls_formation_nocollab_1Fair_30goal_5mil
+  value: di_250805_170033_fafr_walls_formation_nocollab_1Fair_30goal_5mil
 seed:
   desc: null
   value: 0
@@ -98,7 +98,7 @@ num_walls:
   value: 2
 episode_length:
   desc: null
-  value: 25
+  value: 50
 share_policy:
   desc: null
   value: true
@@ -176,7 +176,7 @@ clip_param:
   value: 0.2
 num_mini_batch:
   desc: null
-  value: 1
+  value: 2
 entropy_coef:
   desc: null
   value: 0.01
@@ -348,7 +348,7 @@ _wandb:
     framework: torch
     is_jupyter_run: false
     is_kaggle_kernel: false
-    start_time: 1754415944.954606
+    start_time: 1754427642.39962
     t:
       1:
       - 1
